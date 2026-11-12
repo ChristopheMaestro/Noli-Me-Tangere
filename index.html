@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noli me Tangere: Building the School of San Diego</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-phase="title">
+<canvas id="scene"></canvas>
+
+<!-- The HUD is lettering laid straight over the town: no panels. -->
+<div id="hud">
+  <div id="chipDay">
+    <b id="hudDay"></b>
+    <div class="track"><i id="barTime"><span data-ic="sun"></span></i><span class="end" data-ic="bell"></span></div>
+    <div id="resBar"></div>
+  </div>
+  <div id="chipStage">
+    <b id="hudStage"></b>
+    <div class="track"><i id="barStage"></i></div>
+    <span id="hudStep"></span>
+  </div>
+  <div id="chipPesos"><span data-ic="coin"></span><b id="hudPesos">0</b></div>
+</div>
+
+<div id="marks"></div>
+<div id="buff"><span data-ic="maria"></span><b id="buffT"></b></div>
+<div id="hint"><span data-ic="mouse"></span><span data-ic="shovel"></span></div>
+<div id="toast"><b id="toastTitle"></b></div>
+<div id="floaters"></div>
+
+<div id="controls">
+  <button id="btnL" class="ibtn" data-ic="rotL"></button>
+  <button id="btnR" class="ibtn" data-ic="rotR"></button>
+  <button id="btnMute" class="ibtn" data-ic="sound"></button>
+</div>
+
+<div id="title" class="overlay show">
+  <div class="titleBox">
+    <h1><img id="logo" src="Noli_Me_Tangere.svg" alt="Noli me Tangere" draggable="false"></h1>
+    <h2>Building the School of San Diego</h2>
+    <div id="menuMain" class="menu">
+      <button id="btnContinue">Continue</button>
+      <button id="btnPlay">Play</button>
+      <button id="btnOptions">Options</button>
+      <button id="btnCredits">Credits</button>
+    </div>
+    <div id="menuOptions" class="menu sub">
+      <button id="optSound">Sound: on</button>
+      <button id="optErase">Erase saved game</button>
+      <button class="back">Back</button>
+    </div>
+    <div id="menuCredits" class="menu sub">
+      <p>After the novel <i>Noli Me Tangere</i> by José Rizal (Berlin, 1887).</p>
+      <p>All art is drawn in code. 3D rendering by three.js.</p>
+      <button class="back">Back</button>
+    </div>
+  </div>
+</div>
+
+<div id="dusk" class="overlay">
+  <div class="duskBox">
+    <h3 id="duskTitle"></h3>
+    <p id="duskText"></p>
+    <ul id="duskList"></ul>
+    <button id="duskNext" class="tbtn"></button>
+  </div>
+</div>
+
+<div id="tree" class="overlay">
+  <div id="treeWorld"><svg id="treeEdges" width="1" height="1"></svg></div>
+  <div id="treeBar">
+    <button id="shopBtn" class="tbtn"><span data-ic="bag"></span><b>The shop</b></button>
+    <button id="bossBtn" class="tbtn fight"><span></span><b id="bossName"></b></button>
+    <button id="nextDay" class="tbtn go"><span data-ic="dawn"></span><b id="nextDayT"></b></button>
+  </div>
+</div>
+
+<div id="ask" class="overlay">
+  <div class="duskBox">
+    <h3 id="askTitle"></h3>
+    <p id="askText"></p>
+    <div class="askRow"><button id="askYes" class="tbtn go"></button><button id="askNo" class="tbtn"></button></div>
+  </div>
+</div>
+
+<div id="shop" class="overlay">
+  <div class="shopBox">
+    <h3>The Shop</h3>
+    <p id="shopNote"></p>
+    <div id="shopList"></div>
+    <button id="shopBack" class="tbtn">Back to the tree</button>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="err"></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/world.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

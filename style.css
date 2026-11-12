@@ -1,0 +1,282 @@
+/* Almendra (SIL Open Font License), bundled so the game runs offline */
+@font-face { font-family: 'Almendra'; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/Almendra-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Almendra'; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/Almendra-Bold.woff2) format('woff2'); }
+@font-face { font-family: 'Almendra'; font-style: italic; font-weight: 400; font-display: swap; src: url(fonts/Almendra-Italic.woff2) format('woff2'); }
+
+:root {
+  --paper: #f3e9d2; --paper2: #e8dbbd; --ink: #2e2318; --ink2: #6a5a45;
+  --line: #bfa97c; --red: #c4452f; --gold: #b8862b; --green: #4d8a3a;
+  --hand: #ff8a4c; --crew: #4fa3e0; --works: #5fbf7a; --money: #f2c230; --shadow: #b98ae8;
+  --school: #f3e9d2; --wood: #5fbf7a; --stone: #a9b4c8; --clay: #e07a52; --lake: #45c8d8; --time: #ffe27a; --trade: #e8a0c8;
+  /* Lettering laid straight over the town: cream, with a dark edge so it reads on grass, water and roofs alike. */
+  --cream: #fff6dc; --sun: #ffd35a;
+  --edge: 0 2px 0 rgba(20, 14, 30, .75), 0 0 3px rgba(20, 14, 30, .9), 0 0 14px rgba(20, 14, 30, .55);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2742; color: var(--ink);
+  font-family: 'Almendra', Georgia, 'Times New Roman', serif; user-select: none; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+button { font-family: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; }
+
+/* Pictograms */
+.ic { width: 24px; height: 24px; display: block; flex: none; }
+.ic.px { image-rendering: pixelated; }
+[data-ic] { display: inline-flex; }
+
+/* HUD: the day and its sun on the left, the stage of the school in the middle, the purse on the right. No panels. */
+#hud { position: fixed; top: 0; left: 0; right: 0; padding: 14px 22px 0; display: flex; justify-content: space-between; align-items: flex-start; z-index: 6;
+  pointer-events: none; color: var(--cream); text-shadow: var(--edge); }
+#hud::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 130px; background: linear-gradient(rgba(14, 16, 34, .5), rgba(14, 16, 34, 0)); z-index: -1; }
+#hud > * { pointer-events: auto; }
+#hud .ic { filter: drop-shadow(0 2px 0 rgba(20, 14, 30, .7)); }
+body[data-phase=title] #hud, body[data-phase=title] #controls { display: none; }
+
+#chipDay { width: 230px; }
+#hudDay { display: block; font-size: 30px; line-height: 1; font-style: italic; }
+/* A thin line that fills as the day or the work goes by. On the day's line a sun rides the end of it, towards the bell. */
+.track { position: relative; height: 3px; margin-top: 16px; background: rgba(255, 246, 220, .4); border-radius: 2px; box-shadow: 0 1px 0 rgba(20, 14, 30, .6); }
+.track i { position: relative; display: block; height: 100%; width: 0; background: var(--sun); border-radius: 2px; }
+#chipDay .track { width: 170px; }
+#barTime span { position: absolute; right: -12px; top: -11px; }
+.track .end { position: absolute; right: -30px; top: -11px; }
+body:not([data-phase=day]) #chipDay .track { opacity: .45; }
+
+#chipStage { text-align: center; }
+#hudStage { display: block; font-size: 28px; line-height: 1; font-style: italic; white-space: nowrap; }
+#chipStage .track { width: 260px; margin: 10px auto 6px; }
+#barStage { background: #9fe07a; }
+#hudStep { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; opacity: .9; }
+
+#chipPesos { width: 230px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+#chipPesos .ic { width: 30px; height: 30px; }
+#hudPesos { font-size: 32px; line-height: 1; color: var(--sun); font-variant-numeric: tabular-nums; }
+
+/* Materials: a plain column under the day. */
+#resBar { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.res { display: flex; align-items: center; gap: 8px; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.res .ic { width: 22px; height: 22px; }
+.res.want b { color: #ffb4a0; }
+.res.ok b { color: #b8f08a; }
+
+/* Markers floating over the world: places to work, kilns, interruptions, donors, the convento */
+#marks { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; display: none; }
+body[data-phase=day] #marks { display: block; }
+.mark { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; padding: 0; border-radius: 50%; pointer-events: auto;
+  background: var(--paper); border: 3px solid var(--ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; }
+/* The clickable area reaches a little beyond the button: about one and a half times its size. */
+.mark::before { content: ''; position: absolute; inset: -35%; border-radius: 50%; }
+.mark .ic { width: 32px; height: 32px; transition: transform .08s; }
+.mark:hover .ic { transform: scale(1.12); }
+.mark.hit .ic { animation: hit .14s; }
+@keyframes hit { 50% { transform: scale(.72); } }
+.mark i { display: none; }
+.mark.spot.cur { border-color: #fff; box-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 0 4px #ffd35a; }
+.mark.spot.stopped { background: #b9b3a6; }
+.mark.spot.stopped .ic { filter: grayscale(1); opacity: .6; }
+.mark.kiln { background: #ffe0c4; border-color: #8a3a1c; left: -23px; top: -23px; width: 46px; height: 46px; }
+.mark.kiln .ic { width: 28px; height: 28px; }
+.mark.haz, .mark.boss { background: #ffd9cc; border-color: #b0281a; animation: alarm .5s infinite; z-index: 3; }
+.mark.haz { left: -23px; top: -23px; width: 46px; height: 46px; }
+@keyframes alarm { 50% { box-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 0 6px rgba(210, 58, 42, .5); } }
+.mark.haz::after, .mark.boss::after { content: ''; position: absolute; left: 2px; right: 2px; bottom: -13px; height: 8px; background: #3a1410; border: 2px solid var(--ink); border-radius: 4px; }
+.mark.haz i, .mark.boss i { display: block; position: absolute; left: 4px; bottom: -11px; height: 4px; width: 100%; max-width: calc(100% - 8px); background: #ff5a3c; border-radius: 2px; z-index: 1; }
+.mark.boss { left: -45px; top: -45px; width: 90px; height: 90px; border-width: 5px; }
+.mark.boss .ic { width: 62px; height: 62px; }
+/* Closed: do not click. */
+.mark.boss.shut { background: #3a3448; border-color: #15121a; animation: none; }
+.mark.boss.shut .ic { filter: grayscale(1) brightness(.6); }
+.mark.tg { background: #fff3b0; border-color: #b8862b; animation: bob .6s infinite alternate ease-in-out; z-index: 2; left: -22px; top: -22px; width: 44px; height: 44px; }
+.mark.tg.maria { background: #ffd6e6; border-color: #d0508a; }
+.mark.tg.weak { background: #fff; border-color: #d23a2a; z-index: 4; animation: bob .25s infinite alternate ease-in-out; }
+@keyframes bob { to { margin-top: -8px; } }
+
+#buff { position: fixed; top: 62px; right: 22px; display: none; align-items: center; gap: 8px; color: #ffd6e6; text-shadow: var(--edge);
+  font-size: 24px; font-style: italic; z-index: 6; }
+#buff.show { display: flex; }
+#buff .ic { width: 30px; height: 30px; }
+
+#hint { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; background: rgba(46, 35, 24, .8);
+  padding: 10px 16px; border-radius: 24px; opacity: 0; transition: opacity .4s; pointer-events: none; }
+#hint.show { opacity: 1; }
+#hint .ic { width: 30px; height: 30px; }
+#hint span:first-child { animation: tap .7s infinite; }
+@keyframes tap { 50% { transform: translateY(4px) scale(.92); } }
+
+/* A new stage of the school: its name, large, for a moment. */
+#toast { position: fixed; top: 150px; left: 50%; transform: translate(-50%, -12px); color: var(--cream); text-shadow: var(--edge); font-size: 46px; font-style: italic;
+  white-space: nowrap; opacity: 0; transition: all .35s; pointer-events: none; z-index: 7; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.floater { position: absolute; font-weight: bold; font-size: 20px; color: #fff7dc; text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+  animation: rise .8s ease-out forwards; }
+.floater.crit { font-size: 30px; color: #ffd23a; text-shadow: 0 2px 0 #7a2a10; }
+.floater.gold { color: #ffd23a; }
+.floater.time { color: #ffe27a; font-size: 24px; text-shadow: 0 2px 0 #7a2a10; }
+.floater.bad { color: #ff8a70; font-size: 26px; text-shadow: 0 2px 0 #4a0e08; }
+@keyframes rise { to { transform: translateY(-60px); opacity: 0; } }
+
+/* Small round buttons for the view and the sound */
+.ibtn { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; background: rgba(243, 233, 210, .88);
+  border: 0; border-radius: 50%; box-shadow: 0 2px 0 rgba(20, 14, 30, .5); transition: transform .08s, background .15s; }
+.ibtn:hover:not(:disabled) { background: #fff; transform: translateY(-2px); }
+.ibtn:active:not(:disabled) { transform: translateY(1px); }
+#controls { position: fixed; bottom: 14px; right: 16px; display: flex; gap: 8px; z-index: 6; }
+
+/* Buttons that are words: cream lettering over a thin gold rule that widens under the pointer. */
+.tbtn { position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 6px 4px 10px; background: none; border: 0; color: var(--cream); text-shadow: var(--edge);
+  font-size: 26px; font-style: italic; white-space: nowrap; transition: color .15s, transform .08s; }
+.tbtn::after { content: ''; position: absolute; left: 18%; right: 18%; bottom: 2px; height: 2px; background: var(--sun); border-radius: 2px; box-shadow: 0 1px 0 rgba(20, 14, 30, .6); transition: left .18s, right .18s; }
+.tbtn:hover:not(:disabled) { color: #fff; transform: translateY(-1px); }
+.tbtn:hover:not(:disabled)::after { left: 0; right: 0; }
+.tbtn:disabled { opacity: .4; }
+.tbtn b { font-weight: normal; }
+.tbtn .ic { width: 30px; height: 30px; filter: drop-shadow(0 2px 0 rgba(20, 14, 30, .7)); }
+.tbtn span { display: flex; }
+.tbtn.go { color: var(--sun); font-size: 32px; }
+.tbtn.fight { color: #ffb4a0; }
+.tbtn.fight::after { background: #ff6a4a; }
+
+.pr { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: bold; color: #ffe9a0; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.pr span, #tip .c span { display: inline-flex; align-items: center; gap: 2px; }
+.pr span.no { color: #ff9c8a; }
+#tip .c span.no { color: var(--red); }
+#tip .c { gap: 10px; }
+.pr .ic { width: 14px; height: 14px; }
+.node.gated { border-color: #b0281a; animation: alarm 1s infinite; }
+.node .pr { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 5px; pointer-events: none; }
+
+/* Overlays */
+.overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 24, 44, .45); z-index: 4; }
+.overlay.show { display: flex; }
+
+#title { background: radial-gradient(ellipse at center, rgba(20, 24, 44, .25), rgba(20, 24, 44, .75)); }
+.titleBox { text-align: center; color: var(--cream); text-shadow: 0 3px 0 rgba(0, 0, 0, .55), 0 0 30px rgba(0, 0, 0, .6); opacity: 0; transition: opacity .4s; }
+/* The whole title appears at once, when everything it needs has loaded. */
+body.ready .titleBox { opacity: 1; }
+body:not(.ready) .titleBox { visibility: hidden; }
+h1 { margin: 0; font-size: 88px; line-height: 1; font-style: italic; }
+h2 { margin: 8px 0 26px; font-size: 26px; font-weight: normal; letter-spacing: .06em; }
+#logo { display: block; width: min(720px, 86vw); height: auto; margin: 0 auto; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .6)) drop-shadow(0 0 22px rgba(0, 0, 0, .7)); }
+.menu { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.menu.sub, #btnContinue { display: none; }
+.menu button { position: relative; padding: 5px 8px 9px; font-size: 28px; font-style: italic; background: none; border: 0; color: var(--cream); text-shadow: var(--edge); transition: color .15s, transform .08s; }
+.menu button::after { content: ''; position: absolute; left: 50%; right: 50%; bottom: 3px; height: 2px; background: var(--sun); border-radius: 2px; transition: left .18s, right .18s; }
+.menu button:hover:not(:disabled) { color: var(--sun); }
+.menu button:hover:not(:disabled)::after { left: 8px; right: 8px; }
+.menu button:disabled { opacity: .4; }
+.menu p { margin: 0; max-width: 420px; font-size: 17px; line-height: 1.5; }
+.menu p + button, .menu button + .back { margin-top: 10px; }
+
+/* Evening: a title, a line or two, the day's takings as a list, and one way on. */
+#dusk { background: radial-gradient(ellipse at center, rgba(14, 16, 34, .6), rgba(14, 16, 34, .88)); }
+.duskBox { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 620px; color: var(--cream); text-shadow: var(--edge); text-align: center; animation: drop .4s ease-out; }
+@keyframes drop { from { transform: translateY(-16px); opacity: 0; } }
+.duskBox h3, .shopBox h3 { margin: 0; font-size: 46px; line-height: 1.05; font-weight: normal; font-style: italic; }
+#duskText { margin: 0; font-size: 18px; line-height: 1.55; opacity: .92; }
+#duskList { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+#duskList:empty { display: none; }
+#duskList li { display: flex; align-items: center; gap: 10px; font-size: 20px; font-variant-numeric: tabular-nums; }
+#duskList li b { min-width: 86px; text-align: right; color: var(--sun); }
+#duskList .ic { width: 24px; height: 24px; }
+
+/* Night: the tree of bonuses */
+#tree { display: none; padding: 0; background: rgba(12, 14, 32, .86); cursor: grab; overflow: hidden; touch-action: none; }
+#tree.show { display: block; }
+#tree.grab { cursor: grabbing; }
+#treeWorld { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+#treeEdges { position: absolute; left: 0; top: 0; overflow: visible; }
+#treeEdges line { stroke: #4a4f72; stroke-width: 7; stroke-linecap: round; }
+#treeEdges line.dim { stroke-dasharray: 2 13; }
+#treeEdges line.hidden { display: none; }
+#treeEdges line.on.b-hand { stroke: var(--hand); }
+#treeEdges line.on.b-crew { stroke: var(--crew); }
+#treeEdges line.on.b-wood { stroke: var(--wood); } #treeEdges line.on.b-stone { stroke: var(--stone); } #treeEdges line.on.b-clay { stroke: var(--clay); }
+#treeEdges line.on.b-lake { stroke: var(--lake); } #treeEdges line.on.b-time { stroke: var(--time); } #treeEdges line.on.b-trade { stroke: var(--trade); }
+#treeEdges line.on.b-money { stroke: var(--money); }
+#treeEdges line.on.b-shadow { stroke: var(--shadow); }
+
+.node { position: absolute; width: 68px; height: 68px; padding: 0; border-radius: 16px; border: 4px solid var(--c, #888); background: #3a3f5e;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .5), 0 0 0 3px #15182c; display: flex; align-items: center; justify-content: center; transition: transform .1s, filter .15s; }
+.node.b-hand { --c: var(--hand); } .node.b-crew { --c: var(--crew); } .node.b-school { --c: var(--school); }
+.node.b-wood { --c: var(--wood); } .node.b-stone { --c: var(--stone); } .node.b-clay { --c: var(--clay); } .node.b-lake { --c: var(--lake); } .node.b-time { --c: var(--time); }
+.node.b-money { --c: var(--money); } .node.b-shadow { --c: var(--shadow); } .node.b-trade { --c: var(--trade); }
+.node .nic .ic { width: 44px; height: 44px; }
+.node.hidden { display: none; }
+.node.locked { border-color: #5a5f80; background: #262a44; cursor: default; }
+.node.locked .nic { filter: grayscale(1) brightness(.55); opacity: .7; }
+.node .lk { display: none; position: absolute; right: -9px; bottom: -9px; }
+.node .lk .ic { width: 22px; height: 22px; }
+.node.locked .lk { display: block; }
+.node.open { background: #555b82; }
+.node.open:not(.can) .nic { opacity: .8; }
+.node.open:not(.can) .pr { color: #ff9c8a; }
+.node.owned { background: var(--paper); }
+.node.can { background: #fff6dc; animation: nodeGlow 1.4s infinite; }
+@keyframes nodeGlow { 50% { box-shadow: 0 5px 0 rgba(0, 0, 0, .5), 0 0 0 3px #15182c, 0 0 0 9px color-mix(in srgb, var(--c) 45%, transparent); } }
+.node.maxed { background: linear-gradient(160deg, #fff3b0, #f2b632); border-color: #fff3b0; }
+.node:hover:not(.locked) { transform: translateY(-3px) scale(1.06); z-index: 2; }
+.node.pop { animation: pop .25s; }
+@keyframes pop { 40% { transform: scale(1.22); } }
+.node .lv { position: absolute; right: -10px; top: -10px; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; background: var(--ink); color: #fff6dc;
+  font-size: 13px; font-weight: bold; line-height: 24px; text-align: center; border: 2px solid var(--c); }
+.node .lv:empty { display: none; }
+.node.maxed .lv { background: #f2b632; color: var(--ink); border-color: var(--ink); }
+
+#treeBar { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; gap: 46px; align-items: center; justify-content: center; pointer-events: none; }
+#treeBar > * { pointer-events: auto; }
+
+/* A question asked inside the game, instead of the browser's own dialog. */
+#ask { z-index: 9; background: radial-gradient(ellipse at center, rgba(14, 16, 34, .78), rgba(14, 16, 34, .94)); }
+#askText { margin: 0; font-size: 19px; line-height: 1.55; opacity: .92; white-space: pre-line; }
+.askRow { display: flex; gap: 46px; align-items: baseline; margin-top: 8px; }
+
+/* The shop: a ledger, one line for each material. */
+#shop { z-index: 5; background: rgba(12, 14, 32, .93); }
+.shopBox { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--cream); width: min(1040px, 96vw); max-height: 96vh; }
+#shopNote { margin: 0 0 6px; font-size: 16px; opacity: .8; text-align: center; }
+#shopList { width: 100%; overflow-y: auto; }
+.srow { display: grid; grid-template-columns: 1.3fr 1.2fr 1.6fr 1fr; gap: 18px; align-items: center; padding: 11px 6px; border-bottom: 1px solid rgba(255, 246, 220, .18); font-size: 18px; }
+.srow:first-child { border-top: 1px solid rgba(255, 246, 220, .18); }
+.srow > span { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.srow .what { gap: 9px; flex-wrap: nowrap; white-space: nowrap; }
+.srow .what em { font-style: normal; opacity: .75; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.srow .ord { justify-content: flex-end; }
+.lnk { padding: 2px 0; background: none; border: 0; border-bottom: 1px dotted rgba(255, 246, 220, .7); color: var(--cream); font-size: 17px; white-space: nowrap; }
+.lnk i { font-style: normal; color: var(--sun); font-variant-numeric: tabular-nums; }
+.lnk:hover:not(:disabled) { color: #fff; border-bottom-style: solid; border-bottom-color: var(--sun); }
+.lnk:disabled { opacity: .38; }
+
+/* Tooltip */
+#tip { position: fixed; z-index: 20; display: none; flex-direction: column; gap: 5px; max-width: 300px; background: var(--paper); border: 2px solid var(--ink);
+  border-radius: 10px; padding: 10px 13px; box-shadow: 0 4px 0 rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35); pointer-events: none; font-size: 14px; line-height: 1.4; }
+#tip.show { display: flex; }
+#tip b { font-size: 16px; }
+#tip b i { font-weight: normal; color: var(--ink2); font-size: 13px; margin-left: 6px; }
+#tip span { display: flex; align-items: center; gap: 5px; }
+#tip .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); margin-top: -4px; }
+#tip .k2 { display: block; font-style: italic; color: #7a3a1c; }
+#tip .d { display: block; color: #4a3d2e; }
+#tip .good { color: var(--green); font-weight: bold; }
+#tip .bad { color: var(--red); font-weight: bold; }
+#tip .c { font-weight: bold; font-size: 15px; color: var(--gold); }
+#tip .c.bad { color: var(--red); }
+#tip .ic { width: 18px; height: 18px; }
+
+#err { display: none; position: fixed; left: 0; right: 0; bottom: 0; background: #7a1d12; color: #fff; padding: 8px 12px; font: 13px monospace; z-index: 99; }
+#perf { position: fixed; left: 10px; bottom: 10px; z-index: 30; color: #fff; font: 12px monospace; text-shadow: 0 1px 2px #000; pointer-events: none; }
+
+@media (max-width: 760px) {
+  #hud { padding: 10px 12px 0; }
+  #chipDay, #chipPesos { width: auto; }
+  #chipDay .track { width: 110px; }
+  #chipStage .track { width: 130px; }
+  #hudDay, #hudStage, #hudPesos { font-size: 21px; }
+  .res { font-size: 15px; }
+  .tbtn { font-size: 20px; } .tbtn.go { font-size: 24px; }
+  #treeBar { gap: 18px; flex-wrap: wrap; }
+  .srow { grid-template-columns: 1fr; gap: 6px; }
+  .srow .ord { justify-content: flex-start; }
+  h1 { font-size: 52px; }
+}
