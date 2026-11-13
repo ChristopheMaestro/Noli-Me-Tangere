@@ -162,12 +162,39 @@ h2 { margin: 8px 0 26px; font-size: 26px; font-weight: normal; letter-spacing: .
 .menu { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .menu.sub, #btnContinue { display: none; }
 .menu button { position: relative; padding: 5px 8px 9px; font-size: 28px; font-style: italic; background: none; border: 0; color: var(--cream); text-shadow: var(--edge); transition: color .15s, transform .08s; }
-.menu button::after { content: ''; position: absolute; left: 50%; right: 50%; bottom: 3px; height: 2px; background: var(--sun); border-radius: 2px; transition: left .18s, right .18s; }
+.menu button::after { content: ''; position: absolute; left: 50%; right: 50%; bottom: 3px; height: 2px; background: var(--sun); border-radius: 2px; opacity: 0; transition: left .18s, right .18s, opacity .12s; }
+.menu button:hover:not(:disabled)::after { opacity: 1; }
 .menu button:hover:not(:disabled) { color: var(--sun); }
 .menu button:hover:not(:disabled)::after { left: 8px; right: 8px; }
 .menu button:disabled { opacity: .4; }
 .menu p { margin: 0; max-width: 420px; font-size: 17px; line-height: 1.5; }
-.menu p + button, .menu button + .back { margin-top: 10px; }
+.menu p + button, .menu button + .back, #dbg + .back { margin-top: 10px; }
+.menu p + p { margin-top: 8px; }
+.menu a { color: var(--sun); text-decoration: none; border-bottom: 1px solid rgba(255, 211, 90, .55); }
+.menu a:hover { border-bottom-color: var(--sun); }
+/* The menu over a game in progress (Esc): the same lettering, and everything else of the game put away until it is closed. */
+body.paused #title { background: radial-gradient(ellipse at center, rgba(20, 24, 44, .55), rgba(20, 24, 44, .88)); }
+body.paused #hud, body.paused #controls, body.paused #marks, body.paused #sgBar, body.paused #sgFili, body.paused #hint, body.paused #buff, body.paused #toast, body.paused #floaters,
+body.paused .overlay:not(#title):not(#ask) { display: none !important; }
+/* Debug mode, in the options: rows of lettering, sliders that are a thin rule, tick boxes that are a small outline. */
+#dbg { display: none; flex-direction: column; align-items: center; gap: 7px; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255, 246, 220, .35); font-size: 19px; font-style: italic; text-shadow: var(--edge); }
+#dbg.show { display: flex; }
+.drow { display: grid; grid-template-columns: 124px 180px 96px 40px; align-items: center; justify-content: center; column-gap: 10px; min-height: 28px; text-align: left; }
+.drow select { max-width: 270px; grid-column: 2 / span 3; justify-self: start; }
+.drow label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.drow label.wide { grid-column: 2 / span 3; justify-self: start; }
+.drow b { min-width: 86px; text-align: left; font-weight: normal; color: var(--sun); font-variant-numeric: tabular-nums; }
+.drow .inf { font-size: 26px; line-height: .8; font-style: normal; }
+.drow input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 15px; height: 15px; margin: 0; border: 1.5px solid var(--cream); border-radius: 2px; background: none; cursor: pointer; box-shadow: 0 1px 3px rgba(20, 14, 30, .8); }
+.drow input[type=checkbox]:checked { background: var(--sun); border-color: var(--sun); box-shadow: inset 0 0 0 2.5px #1c1830, 0 1px 3px rgba(20, 14, 30, .8); }
+.drow input[type=range] { appearance: none; -webkit-appearance: none; width: 170px; height: 16px; margin: 0; background: none; cursor: pointer; }
+.drow input[type=range]::-webkit-slider-runnable-track { height: 2px; background: rgba(255, 246, 220, .7); border-radius: 2px; box-shadow: 0 1px 3px rgba(20, 14, 30, .9); }
+.drow input[type=range]::-moz-range-track { height: 2px; background: rgba(255, 246, 220, .7); border-radius: 2px; }
+.drow input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5px; border-radius: 50%; background: var(--sun); border: 0; box-shadow: 0 1px 3px rgba(20, 14, 30, .9); }
+.drow input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--sun); border: 0; }
+.drow input:disabled { opacity: .35; cursor: default; }
+.drow select { appearance: none; -webkit-appearance: none; padding: 0 2px 1px; font: inherit; color: var(--sun); text-shadow: var(--edge); background: none; border: 0; border-bottom: 1px solid rgba(255, 211, 90, .55); border-radius: 0; cursor: pointer; outline: none; }
+.drow select option { color: #1c1830; background: #f3e9d2; font-style: normal; }
 
 /* Evening: a title, a line or two, the day's takings as a list, and one way on. */
 #dusk { background: radial-gradient(ellipse at center, rgba(14, 16, 34, .6), rgba(14, 16, 34, .88)); }
@@ -234,16 +261,16 @@ h2 { margin: 8px 0 26px; font-size: 26px; font-weight: normal; letter-spacing: .
 
 /* The shop: a ledger, one line for each material. */
 #shop { z-index: 5; background: rgba(12, 14, 32, .93); }
-.shopBox { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--cream); width: min(1040px, 96vw); max-height: 96vh; }
+.shopBox { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--cream); width: min(1320px, 98vw); max-height: 96vh; }
 #shopNote { margin: 0 0 6px; font-size: 16px; opacity: .8; text-align: center; }
 #shopList { width: 100%; overflow-y: auto; }
-.srow { display: grid; grid-template-columns: 1.3fr 1.2fr 1.6fr 1fr; gap: 18px; align-items: center; padding: 11px 6px; border-bottom: 1px solid rgba(255, 246, 220, .18); font-size: 18px; }
+.srow { display: grid; grid-template-columns: 15em 16em 26em minmax(11em, 1fr); gap: .8em; align-items: center; padding: 11px 6px; border-bottom: 1px solid rgba(255, 246, 220, .18); font-size: clamp(11px, 1.3vw, 18px); }
 .srow:first-child { border-top: 1px solid rgba(255, 246, 220, .18); }
-.srow > span { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.srow > span { display: flex; align-items: center; gap: 1em; flex-wrap: nowrap; white-space: nowrap; }
 .srow .what { gap: 9px; flex-wrap: nowrap; white-space: nowrap; }
 .srow .what em { font-style: normal; opacity: .75; font-variant-numeric: tabular-nums; margin-left: 4px; }
 .srow .ord { justify-content: flex-end; }
-.lnk { padding: 2px 0; background: none; border: 0; border-bottom: 1px dotted rgba(255, 246, 220, .7); color: var(--cream); font-size: 17px; white-space: nowrap; }
+.lnk { padding: 2px 0; background: none; border: 0; border-bottom: 1px dotted rgba(255, 246, 220, .7); color: var(--cream); font-size: .94em; white-space: nowrap; }
 .lnk i { font-style: normal; color: var(--sun); font-variant-numeric: tabular-nums; }
 .lnk:hover:not(:disabled) { color: #fff; border-bottom-style: solid; border-bottom-color: var(--sun); }
 .lnk:disabled { opacity: .38; }
@@ -280,3 +307,51 @@ h2 { margin: 8px 0 26px; font-size: 26px; font-weight: normal; letter-spacing: .
   .srow .ord { justify-content: flex-start; }
   h1 { font-size: 52px; }
 }
+
+/* ---------- The siege ---------- */
+body.siege #resBar .res, body.siege #marks, body.siege #hint, body.siege #buff { display: none !important; }
+#sgHp, #sgFili, #sgBar { display: none; }
+body.siege #sgHp { display: flex; margin-top: 20px; font-size: 22px; }
+body.siege #sgHp .ic { width: 26px; height: 26px; }
+body.siege #sgFili { position: fixed; top: 58px; right: 22px; z-index: 6; display: flex; align-items: center; gap: 8px; color: var(--cream); text-shadow: var(--edge); font-size: 22px; font-variant-numeric: tabular-nums; }
+body.siege #sgFili .ic { width: 28px; height: 28px; filter: drop-shadow(0 2px 0 rgba(20, 14, 30, .7)); }
+body.siege[data-phase=title] #sgFili { display: none; }
+body.siege[data-phase=siege] #sgBar { position: fixed; left: 0; right: 0; bottom: 14px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+#sgHint { margin: 0; min-height: 22px; color: var(--cream); text-shadow: var(--edge); font-size: 17px; font-style: italic; }
+#sgRow { display: flex; gap: 34px; align-items: flex-end; justify-content: center; flex-wrap: wrap; padding: 0 190px; }
+#sgRow > * { pointer-events: auto; }
+#sgRow .tbtn { font-size: 21px; }
+#sgRow .tbtn i { display: inline-flex; align-items: center; gap: 3px; font-style: normal; font-size: 17px; color: var(--sun); font-variant-numeric: tabular-nums; }
+#sgRow .tbtn i .ic { width: 20px; height: 20px; }
+#sgRow .tbtn.post::after { opacity: 0; }
+#sgRow .tbtn.post:hover::after, #sgRow .tbtn.post.cur::after { opacity: 1; }
+#sgRow .tbtn.post.cur { color: #fff; }
+#sgRow .tbtn.post.cur::after { left: 0; right: 0; height: 3px; }
+#sgRow .tbtn.post.poor { opacity: .5; }
+#sgRow .tbtn.post.poor i { color: #ff9c8a; }
+#sgRow .tbtn.go { font-size: 28px; }
+#sgRow .tbtn.go.fight, #tree2Bar .tbtn.go.fight { color: #ffb4a0; }
+body.siege[data-phase=siege] #scene { cursor: crosshair; }
+#tree2 { display: none; padding: 0; background: rgba(34, 12, 16, .84); overflow: hidden; }
+#tree2.show { display: block; }
+#tree2World { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+#tree2Edges { position: absolute; left: 0; top: 0; overflow: visible; }
+#tree2Edges line { stroke: #c9a23a; stroke-width: 7; stroke-linecap: round; }
+#tree2Edges line.dim { stroke: #6a4a52; stroke-dasharray: 2 13; }
+#tree2Bar { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; }
+.node.s-men { --c: #ff6a4a; } .node.s-post { --c: var(--crew); } .node.s-arms { --c: var(--hand); } .node.s-town { --c: var(--stone); } .node.s-chest { --c: var(--money); } .node.s-friend { --c: var(--shadow); }
+
+/* The view: drag to move the map */
+#scene { touch-action: none; }
+#scene.grab { cursor: grabbing !important; }
+#btnSpeed { font-size: 19px; font-weight: 700; color: #2e2318; font-variant-numeric: tabular-nums; }
+#btnSpeed.fast { background: var(--sun); }
+
+/* The title once the school stands: "Building" struck out in red, "Defending" written over it */
+#h2Word { position: relative; display: inline-block; }
+#h2Word svg, #h2Word em { display: none; }
+#h2Word.war svg { display: block; position: absolute; left: -8%; top: 0; width: 116%; height: 100%; overflow: visible; pointer-events: none; }
+#h2Word.war svg path { fill: none; stroke: #d2281e; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+#h2Word.war em { display: block; position: absolute; left: 50%; bottom: 80%; transform: translateX(-50%) rotate(-5deg); font-size: 31px; font-weight: 700; color: #140d0a; white-space: nowrap;
+  text-shadow: 0 0 2px var(--cream), 0 0 4px var(--cream), 0 0 8px var(--cream), 0 0 14px rgba(255, 246, 220, .7); }
+h2:has(.war) { margin-top: 34px; }

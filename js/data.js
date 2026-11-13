@@ -268,4 +268,128 @@ window.Noli = window.Noli || {};
 
     ending: 'On a clear morning the children of San Diego walk in under a tiled roof and sit down at desks. In Rizal\'s novel this never happens: the school is left unfinished, its founder is accused of a rebellion staged to ruin him, and he escapes across the lake while Elías dies in his place. Here, for once, the bell that rings is the school\'s own.'
   };
+
+  // ---------- The siege: what comes after the school is finished ----------
+  // The workers take up arms as filibusteros, the materials are gone, and the game becomes a defence of the school.
+  var plus = function (v) { return '+' + Math.round((v - 1) * 100) + '%'; };
+  Noli.Data.siege = {
+    HP: 20,            // what the school can take in a day before it is overrun
+    MIN_F: 20,         // filibusteros you have at the least, however few workers were hired
+    BOSS_EVERY: 5,     // days between one leader and the next
+    SPEED: 3,          // world units a second for an enemy of speed 1
+    FOES: 9, FOES_GROW: 1.6, MAX_FOES: 70, // enemies in a day: FOES + FOES_GROW for each day already held
+    HP_GROW: 1.17, BOUNTY_GROW: 1.105,     // each day held, enemies are this much tougher and pay this much more
+    BOSS_ESCORT: 0.6,  // on a leader's day, this share of the usual numbers march with him
+    BOSS_LAST: 0.12,   // posts shoot whoever is furthest along the road; a leader counts as this share of the road further back, so his escort is not let through
+    WOUND_MIN: 0.15,   // a leader who gets through comes back the next day with the wounds he took, but never with less than this share of his strength
+    CALL_EVERY: 4, CALL_HP: 0.4, // the Alférez: seconds between the guardias who fall in beside him, and their strength beside an ordinary one's
+    LEVEL_DMG: 1.3,    // each level of a post multiplies what it does
+    SPOT: [1.2, 4.4, 2.4], // a post stands at least and at most this far from a road, and this far from another post
+
+    // The roads the enemy comes by, from the edge of the map to the school door. The first is used from the start,
+    // the second once the first leader is beaten, the third after the second.
+    routes: [
+      [[-41, 64], [-40, 50], [-39.5, 40], [-37, 24], [-33, 17.2], [-29.4, 12.5], [-30.8, 2.8], [-16.5, -5.7], [-14, -2.8], [1.4, 2.8], [0.4, 5.6], [3.4, 7.3]],
+      [[-21, -64], [-25, -54], [-27, -44.5], [-28, -37.5], [-24, -31], [-28, -24], [-28, -15.5], [-26.6, -7], [-23.8, -1.4], [-16.5, -5.7], [-14, -2.8], [1.4, 2.8], [0.4, 5.6], [3.4, 7.3]],
+      [[64, 17], [52, 14.5], [40, 13], [21, 10.4], [16, 12.4], [12.2, 12], [10.1, 10.4], [8, 8.8], [7, 7.6], [5, 7.4]]
+    ],
+    START: [14, 10, 12], // how far along each road the enemy first shows (the roads themselves run on to the edge)
+
+    // The posts. cost in filibusteros; dmg a shot, rate shots a second, range in world units.
+    towers: [
+      { id: 'tirador', icon: 'tower', name: 'Tiradores', cost: 20, dmg: 4, rate: 1, range: 7,
+        desc: 'Slingers on a bamboo lookout. Cheap, and quick with a stone.' },
+      { id: 'escopeta', icon: 'rifle', name: 'Escopeteros', cost: 35, dmg: 17, rate: 0.5, range: 11,
+        desc: 'Old fowling pieces dug up from under the floorboards. A long reach, slow to load.' },
+      { id: 'lantaka', icon: 'cannon', name: 'Lantaka', cost: 50, dmg: 11, rate: 0.42, range: 6.5, splash: 2.8,
+        desc: 'A bronze swivel gun off a lake boat. Its shot hurts everyone near where it lands.' },
+      { id: 'bitag', icon: 'net', name: 'Snares', cost: 25, dmg: 1.5, rate: 0.8, range: 6, slow: 0.4, slowT: 2.2,
+        desc: 'Fishing nets and trip-lines. Whoever is caught walks slowly for a while.' }
+    ],
+
+    // The enemy. hp, bounty in pesos and speed are for the first day; hit is what one costs the school if he gets in.
+    // from: the first day (counting days held) he is seen.
+    foeOrder: ['guardia', 'cuadrillero', 'cazador', 'lego', 'carabinero'],
+    foes: {
+      guardia: { name: 'Guardia Civil', hp: 10, speed: 1, bounty: 2, hit: 1, from: 0, look: { hat: 'cap', top: 0x2a4a9a, bottom: 0xf0e8d8, shoe: 0x1a1420, sash: 0xfff6ea } },
+      cuadrillero: { name: 'Cuadrillero', hp: 6, speed: 1.6, bounty: 2, hit: 1, from: 2, look: { top: 0xb8a070, bottom: 0x4a4a6a, hair: 0x2a1c16, sash: 0xd8222a } },
+      cazador: { name: 'Cazador', hp: 36, speed: 0.75, bounty: 6, hit: 2, from: 4, look: { hat: 'cap', top: 0xf0e8d8, bottom: 0xd8222a, shoe: 0x1a1420, sash: 0x2a4a9a, big: 1.12 } },
+      lego: { name: 'Lay brother', hp: 22, speed: 1, bounty: 5, hit: 2, from: 7, noSlow: true, look: { robe: 0x3a3440, cord: 0xfff6e0, style: 'tonsure', hair: 0x2a1c16 } },
+      carabinero: { name: 'Carabinero', hp: 30, speed: 1.35, bounty: 7, hit: 3, from: 11, look: { hat: 'cap', top: 0x3a6a4a, bottom: 0x2a2634, shoe: 0x1a1420, sash: 0xf7c930 } }
+    },
+
+    // The five leaders. hp is for the first day and grows like everyone else's; a leader who reaches the school takes it for the day.
+    bosses: [
+      { id: 'sacristan', icon: 'bossSacristan', name: 'The Sacristan Mayor', hp: 120, speed: 0.55, bounty: 60,
+        look: { robe: 0x2a2634, cord: 0xfff6e0, hair: 0x2a1c16, skin: 0xd0a070, big: 1.7 },
+        text: 'The man who beat little Crispín over two gold pieces he never took comes up the road at the head of the convento\'s servants, swinging his rattan.',
+        how: 'Nothing clever about him: he is simply hard to stop.' },
+      { id: 'consolacion', icon: 'bossConsolacion', name: 'Doña Consolación', hp: 150, speed: 0.6, bounty: 90, trait: 'whip',
+        look: { robe: 0x8a2a3a, stripe: 0x2a2634, top: 0xe8463a, style: 'long', hair: 0x1a1420, big: 1.7 },
+        text: 'The Alférez\'s wife, the Muse of the Guardia Civil, who made mad Sisa dance under the whip. She has brought it with her.',
+        how: 'Everyone near her whip walks half as fast again. Snares slow them down all the same.' },
+      { id: 'alferez', icon: 'bossAlferez', name: 'The Alférez', hp: 170, speed: 0.55, bounty: 120, trait: 'call',
+        look: { hat: 'cap', top: 0xf0e8d8, bottom: 0x2a4a9a, shoe: 0x1a1420, sash: 0xf7c930, big: 1.75 },
+        text: 'The commander of the Guardia Civil of San Diego, drunk and delighted: at last, a rebellion he can report to Manila.',
+        how: 'A guardia falls in beside him every four seconds, for as long as he walks.' },
+      { id: 'salvi', icon: 'salvi', name: 'Padre Salvi', hp: 420, speed: 0.5, bounty: 150, trait: 'heal',
+        look: { robe: 0x5a4034, cord: 0xfff6e0, hair: 0x2a1c16, style: 'tonsure', skin: 0xf2dcc8, big: 1.75 },
+        text: 'Thin, silent Padre Salvi, who denounced a rising he had arranged himself. He walks in the middle of his men and blesses them.',
+        how: 'Those who walk near him are healed as they go. Bring him down first, or hit them all at once.' },
+      { id: 'damaso', icon: 'damaso', name: 'Padre Dámaso', hp: 800, speed: 0.45, bounty: 200, trait: 'stone',
+        look: { robe: 0x6e4a32, cord: 0xfff6e0, hair: 0x4a3020, style: 'tonsure', skin: 0xe6bc9c, big: 2 },
+        text: 'Twenty years curate of San Diego, the man who had your father dug out of his grave. He has come to see the school pulled down stone by stone.',
+        how: 'No snare holds him, and he gets his breath back as he walks.' }
+    ],
+
+    branches: { men: 'The filibusteros', post: 'The posts', arms: 'Arms', town: 'The town', chest: 'The war chest', friend: 'Friends' },
+    // The tree of the siege, paid in pesos. Same fields as the tree of bonuses above.
+    upgrades: [
+      { id: 'recluta', icon: 'fili', branch: 'men', x: 0, y: 0, req: {}, max: 40, cost: 22, growth: 1.14,
+        name: 'Recruits', desc: 'Men come down from the hills to join you. Filibusteros are what posts are raised with.',
+        val: function (l) { return l * 5; }, show: function (v) { return '+' + v + ' filibusteros'; } },
+      { id: 'tirador', icon: 'tower', branch: 'post', x: -1, y: -1, req: { recluta: 0 }, max: 10, cost: 28, growth: 1.6,
+        name: 'Tiradores', desc: 'Better slings, and more practice with them.',
+        val: function (l) { return l + 1; }, show: function (v) { return 'level ' + v; } },
+      { id: 'bitag', icon: 'net', branch: 'post', x: -2, y: -1, req: { tirador: 2 }, max: 10, cost: 55, growth: 1.55,
+        name: 'Snares', desc: 'The first level lets you raise snares. Each level after catches harder.',
+        val: function (l) { return l; }, show: function (v) { return 'level ' + v; } },
+      { id: 'escopeta', icon: 'rifle', branch: 'post', x: 0, y: -1, req: { tirador: 2 }, max: 10, cost: 70, growth: 1.6,
+        name: 'Escopeteros', desc: 'The first level lets you raise posts of escopeteros. Each level after makes them deadlier.',
+        val: function (l) { return l; }, show: function (v) { return 'level ' + v; } },
+      { id: 'lantaka', icon: 'cannon', branch: 'post', x: 1, y: -1, req: { escopeta: 2 }, max: 10, cost: 180, growth: 1.6,
+        name: 'Lantaka', desc: 'The first level lets you mount lantakas. Each level after gives them a heavier charge.',
+        val: function (l) { return l; }, show: function (v) { return 'level ' + v; } },
+      { id: 'tanaw', icon: 'eye', branch: 'arms', x: -1, y: -2, req: { tirador: 3 }, max: 6, cost: 60, growth: 1.75,
+        name: 'Lookouts', desc: 'Boys in the palm tops call out who is coming. Every post reaches further.',
+        val: function (l) { return 1 + 0.06 * l; }, show: plus },
+      { id: 'pulbura', icon: 'spark', branch: 'arms', x: 0, y: -2, req: { escopeta: 1 }, max: 10, cost: 80, growth: 1.62,
+        name: 'Dry Powder', desc: 'Powder kept in sealed jars, shot counted out beforehand. Every post fires faster.',
+        val: function (l) { return 1 + 0.07 * l; }, show: plus },
+      { id: 'apoy', icon: 'flame', branch: 'arms', x: 1, y: -2, req: { lantaka: 1 }, max: 5, cost: 160, growth: 1.8,
+        name: 'Tasio\'s Fire-pots', desc: 'The old philosopher has read how the Greeks did it. Whatever is hit goes on burning for three seconds.',
+        val: function (l) { return 0.12 * l; }, show: function (v) { return Math.round(v * 100) + '% of each hit again, every second'; } },
+      { id: 'pader', icon: 'wall', branch: 'town', x: -1, y: 1, req: { recluta: 0 }, max: 10, cost: 35, growth: 1.55,
+        name: 'Shored Walls', desc: 'Beams against the doors, sacks in the windows. The school can take more.',
+        val: function (l) { return l * 5; }, show: function (v) { return '+' + v + ' for the school'; } },
+      { id: 'lunas', icon: 'heart', branch: 'town', x: -2, y: 1, req: { pader: 2 }, max: 5, cost: 110, growth: 1.8,
+        name: 'The Infirmary', desc: 'Sisa\'s boy Basilio carries water and lint. The school mends while the fight goes on.',
+        val: function (l) { return l * 0.12; }, show: function (v) { return '+' + (v * 10).toFixed(1) + ' every ten seconds'; } },
+      { id: 'barikada', icon: 'scaffold', branch: 'town', x: 0, y: 1, req: { recluta: 0 }, max: 8, cost: 60, growth: 1.65,
+        name: 'Barricades', desc: 'Carts, benches and church pews across every road. All the enemy walk more slowly.',
+        val: function (l) { return 1 - 0.04 * l; }, show: function (v) { return Math.round((1 - v) * 100) + '% slower'; } },
+      { id: 'elias', icon: 'boat', branch: 'friend', x: 0, y: 2, req: { barikada: 2 }, max: 6, cost: 220, growth: 1.75,
+        name: 'Elías', desc: 'The pilot is not dead, whatever the novel says. Every few seconds he picks off the strongest man on the road.',
+        val: function (l) { return l; }, show: function (v) { return 'a shot every ' + (6.5 - 0.5 * v) + ' seconds'; } },
+      { id: 'gantimpala', icon: 'bag', branch: 'chest', x: 1, y: 1, req: { recluta: 0 }, max: 10, cost: 45, growth: 1.6,
+        name: 'Spoils', desc: 'Rifles, boots and cartridge belts fetch a price across the lake. More pesos for every enemy brought down.',
+        val: function (l) { return 1 + 0.15 * l; }, show: plus },
+      { id: 'kaban', icon: 'stack', branch: 'chest', x: 2, y: 1, req: { gantimpala: 2 }, max: 5, cost: 90, growth: 1.9,
+        name: 'Capitán Tiago\'s Purse', desc: 'He backs every side, and yours too. Pesos arrive each dawn, more the longer you hold.',
+        val: function (l) { return l * 12; }, show: function (v) { return v + ' pesos each dawn, growing with the days'; } }
+    ],
+
+    intro: 'The town is with you. The convento is not. The friars have told Manila that the school is a nest of filibusteros, and the Guardia Civil is on the road with every bully the curate could hire. Your workers have put down their tools and picked up what they could find. The materials are spent, the money is gone: all you have is them.',
+    victory: 'Padre Dámaso is carried back to the convento on a door. The Captain-General, who never liked the friars, lets it be known that the school of San Diego is under his protection. They may come again; but the children are at their desks, and the men on the lookouts are not going home yet.'
+  };
 })();

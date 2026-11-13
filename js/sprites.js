@@ -180,6 +180,28 @@
         p.set(x, y, c);
       }
       return p;
+    },
+    // What a siege leaves of them: a dark hole with shards of glass round its edge.
+    stainedBroken: function () {
+      var p = ONE.stained();
+      for (var y = 0; y < 24; y++) for (var x = 0; x < 16; x++) {
+        if (p.get(x, y) === 0xd8c49a) continue;
+        if (Math.abs(x - 7.5) / 5.6 + Math.abs(y - 13) / 10 + (hash(x * 3, y * 5) - 0.5) * 0.55 < 0.8) p.set(x, y, hash(x, y) > 0.94 ? 0x3a3048 : 0x120e18);
+      }
+      return p;
+    },
+    roseBroken: function () {
+      var p = ONE.rose();
+      for (var y = 0; y < 16; y++) for (var x = 0; x < 16; x++) {
+        var r = Math.sqrt((x - 7.5) * (x - 7.5) + (y - 7.5) * (y - 7.5));
+        if (r < 5.2 + (hash(x * 3, y * 7) - 0.5) * 3) p.set(x, y, 0x120e18);
+      }
+      return p;
+    },
+    puff: function () { // a puff of smoke
+      var p = new Pix(8, 8);
+      for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { var d = (x - 3.5) * (x - 3.5) + (y - 3.5) * (y - 3.5); if (d < 13) p.set(x, y, d < 4 && y < 4 ? 0x8a8086 : y > 4 ? 0x4a4248 : 0x6a6066); }
+      return p;
     }
   };
   A.one = function (name) { return one[name] || (one[name] = tex(ONE[name]().canvas(), false)); };
@@ -247,77 +269,7 @@
   }
   A.person = function (o) { return [0, 1, 2].map(function (f) { return tex(drawPerson(o, f).canvas(), false); }); };
 
-  // ---------- Plants ----------
-  var PAL = {
-    mango: [0x1d5c38, 0x2e8744, 0x4db357, 0x93dc6c], forest: [0x154a3c, 0x1f6e4a, 0x359654, 0x67c06a],
-    flame: [0x8f2430, 0xd43d2e, 0xf46a36, 0xffb84d], narra: [0x6d8a26, 0xa3ba30, 0xdcd443, 0xfff383],
-    acacia: [0x23663a, 0x3a9148, 0x62bd55, 0xa8e574]
-  };
-  function canopy(p, cx, cy, r, pal) {
-    for (var y = -r; y <= r; y++) for (var x = -r; x <= r; x++) {
-      if (x * x + y * y > r * r) continue;
-      var l = (-x * 0.55 - y * 0.8) / r + (hash(cx + x * 3.3, cy + y * 5.1) - 0.5) * 0.5;
-      p.set(cx + x, cy + y, l > 0.55 ? pal[3] : l > 0.1 ? pal[2] : l > -0.4 ? pal[1] : pal[0]);
-    }
-  }
-  function drawTree(kind, seed) {
-    var r = rng(seed * 97 + 13), p = new Pix(44, 52), pal = PAL[kind], tr = 0x7a5234, i;
-    p.rect(20, 30, 4, 20, tr); p.rect(23, 30, 1, 20, dk(tr, 0.35)); p.rect(20, 30, 1, 20, lt(tr, 0.2)); p.rect(19, 48, 6, 2, tr); p.set(24, 49, dk(tr, 0.35));
-    var wide = kind === 'flame' || kind === 'acacia', list = [[22, 21, 9]];
-    for (i = 0; i < 8; i++) list.push([22 + (r() - 0.5) * (wide ? 22 : 16), 21 + (r() - 0.5) * (wide ? 9 : 14), 6 + r() * (wide ? 2 : 4)]);
-    list.sort(function (a, b) { return a[1] - b[1]; });
-    list.forEach(function (d) { canopy(p, Math.round(d[0]), Math.round(d[1]), Math.round(d[2]), kind === 'flame' && r() < 0.22 ? PAL.acacia : pal); });
-    if (kind === 'mango') for (i = 0; i < 9; i++) { var x = 8 + r() * 28, y = 10 + r() * 18; if (p.get(x, y) >= 0) p.set(x, y, 0xf7a928); }
-    return p.outline(0x1a1e30);
-  }
-  function drawBalete() {
-    var r = rng(404), p = new Pix(96, 90), i, y;
-    for (i = 0; i < 12; i++) { var x = 14 + r() * 68, len = 16 + r() * 34; for (y = 34; y < 34 + len; y++) p.set(x, y, 0x8f7c5c); }
-    p.rect(40, 40, 16, 49, 0x6a5038);
-    for (i = 0; i < 10; i++) { var rx = 30 + i * 4 + Math.floor(r() * 2), w = 2 + Math.floor(r() * 2); p.rect(rx, 44 + Math.floor(r() * 8), w, 45, mix(0x5c442e, 0x8a6a48, r())); }
-    p.rect(36, 86, 24, 3, 0x5c442e);
-    var list = [];
-    for (i = 0; i < 22; i++) list.push([48 + (r() - 0.5) * 60, 28 + (r() - 0.5) * 24, 9 + r() * 4]);
-    list.sort(function (a, b) { return a[1] - b[1]; });
-    list.forEach(function (d) { canopy(p, Math.round(d[0]), Math.round(d[1]), Math.round(d[2]), PAL.forest); });
-    return p.outline(0x131a2a);
-  }
-  function frond(p, cx, cy, dx, L, rise, droop, broad, cl, cm, cd) {
-    for (var i = 0; i <= L * 2; i++) {
-      var t = i / (L * 2), x = Math.round(cx + dx * L * t), y = Math.round(cy - rise * L * t + droop * L * t * t), k;
-      if (broad) { var wd = Math.round(1 + 2.4 * Math.sin(Math.PI * Math.min(1, t * 1.1))); for (k = 0; k < wd; k++) p.set(x, y + k, k === 0 ? cl : (k === wd - 1 ? cd : cm)); }
-      else { var len = 1 + Math.round(3 * Math.sin(Math.PI * t)); p.set(x, y, cl); for (k = 1; k <= len; k++) p.set(x, y + k, (x + k) % 2 ? cm : cd); }
-    }
-  }
-  function drawPalm(seed) {
-    var r = rng(seed * 53 + 5), p = new Pix(40, 56), lean = (r() - 0.5) * 7, tr = 0xa8845a, y, x;
-    for (y = 54; y >= 18; y--) {
-      var t = (54 - y) / 36; x = Math.round(20 + lean * t * t);
-      var ring = y % 3 === 0;
-      p.set(x - 1, y, ring ? tr : lt(tr, 0.25)); p.set(x, y, ring ? dk(tr, 0.2) : tr); p.set(x + 1, y, dk(tr, 0.35));
-    }
-    var cx = Math.round(20 + lean), cy = 18;
-    [[-1, 0.15, 0.55], [-0.8, 0.5, 0.6], [-0.45, 0.85, 0.5], [0.45, 0.85, 0.5], [0.8, 0.5, 0.6], [1, 0.15, 0.55]].forEach(function (f) {
-      frond(p, cx, cy, f[0], 14, f[1], f[2], false, 0x9fe05a, 0x4fae45, 0x2b7a3c);
-    });
-    frond(p, cx, cy, 0.12, 8, 0.9, 0.1, false, 0x9fe05a, 0x4fae45, 0x2b7a3c);
-    p.rect(cx - 2, cy + 1, 2, 2, 0x6a4a2a); p.rect(cx + 1, cy + 1, 2, 2, 0x7a5632); p.set(cx - 2, cy + 1, 0x9a7446);
-    return p.outline(0x1a1e30);
-  }
-  function drawBanana() {
-    var p = new Pix(26, 28);
-    p.rect(12, 13, 2, 14, 0x9fbe52); p.rect(13, 13, 1, 14, 0x6f9a3e);
-    [[-1, 0.3, 0.5], [-0.6, 0.9, 0.45], [0.6, 0.9, 0.45], [1, 0.3, 0.5], [0.1, 1.1, 0.1]].forEach(function (f) {
-      frond(p, 13, 13, f[0], 10, f[1], f[2], true, 0xb6ec62, 0x62c048, 0x358a3c);
-    });
-    return p.outline(0x1a1e30);
-  }
-  function drawBush(color, seed) {
-    var r = rng(seed * 29 + 3), p = new Pix(22, 16), i;
-    canopy(p, 7, 9, 5, PAL.mango); canopy(p, 14, 9, 5, PAL.mango); canopy(p, 11, 7, 5, PAL.acacia);
-    for (i = 0; i < 16; i++) { var x = 3 + r() * 16, y = 3 + r() * 10; if (p.get(x, y) >= 0) { p.set(x, y, color); if (r() < 0.4) p.set(x + 1, y, lt(color, 0.45)); } }
-    return p.outline(0x1a1e30);
-  }
+  // ---------- Animals (trees and plants are solids now: see world.js) ----------
   function drawCarabao() {
     var p = new Pix(32, 22), B = 0x4c4858, H = 0xdcd6c2;
     p.rect(5, 8, 17, 8, B); p.rect(6, 7, 15, 1, lt(B, 0.25)); p.rect(5, 14, 17, 2, dk(B, 0.3));
@@ -330,6 +282,16 @@
     p.rect(10, 4, 4, 3, 0xffffff); p.set(14, 3, 0xffffff); p.set(14, 2, 0xffffff); p.set(15, 1, 0xffffff); p.set(16, 1, 0xf2b632); p.set(17, 1, 0xf2b632); p.set(9, 5, 0xe6eef6);
     return p.outline(0x231a2e);
   }
+  function drawDeadCarabao() { // on its side, legs stiff, the crows already at it
+    var p = new Pix(32, 16), B = 0x4c4858, H = 0xdcd6c2;
+    p.rect(5, 7, 18, 7, B); p.rect(6, 6, 16, 1, lt(B, 0.2)); p.rect(5, 12, 18, 2, dk(B, 0.3));
+    [[7, 2, 5], [11, 3, 4], [16, 2, 5], [20, 3, 4]].forEach(function (l, i) { p.rect(l[0], l[1], 2, l[2], i % 2 ? dk(B, 0.3) : B); p.rect(l[0], l[1], 2, 1, 0x1a1420); });
+    p.rect(22, 9, 7, 5, B); p.rect(27, 11, 3, 3, lt(B, 0.18)); p.set(25, 10, 0x1a1420); p.set(26, 11, 0x1a1420); p.set(26, 10, 0xffffff); p.set(25, 11, 0xffffff);
+    [[23, 8], [22, 7], [21, 7], [26, 8], [27, 7], [28, 7]].forEach(function (h) { p.set(h[0], h[1], H); });
+    p.rect(12, 9, 4, 3, 0x8a2a2a); p.set(13, 12, 0x8a2a2a); p.set(11, 10, 0x6a1e22);
+    [[13, 5], [14, 5], [14, 4], [15, 5], [18, 5], [19, 5], [19, 4]].forEach(function (c) { p.set(c[0], c[1], 0x14101a); }); p.set(16, 5, 0xd8a236); p.set(20, 4, 0xd8a236);
+    return p.outline(0x231a2e);
+  }
   function drawChicken(body) {
     var p = new Pix(10, 10);
     p.rect(2, 4, 5, 3, body); p.set(1, 3, body); p.set(1, 4, dk(body, 0.2)); p.rect(6, 2, 2, 3, body);
@@ -337,14 +299,9 @@
     p.set(3, 7, 0xf2b632); p.set(5, 7, 0xf2b632); p.rect(2, 6, 5, 1, dk(body, 0.2));
     return p.outline(0x231a2e);
   }
-  A.plant = function (kind, v) {
-    var k = kind + ':' + (v || 0); if (one[k]) return one[k];
-    var p = kind === 'palm' ? drawPalm(v || 0) : kind === 'balete' ? drawBalete() : kind === 'banana' ? drawBanana() : kind === 'bush' ? drawBush(v, v % 97) : drawTree(kind, v || 0);
-    return (one[k] = tex(p.canvas(), false));
-  };
   A.animal = function (kind, v) {
     var k = kind + ':' + (v || 0);
-    return one[k] || (one[k] = tex((kind === 'carabao' ? drawCarabao() : drawChicken(v || 0xffffff)).canvas(), false));
+    return one[k] || (one[k] = tex((kind === 'carabao' ? drawCarabao() : kind === 'deadbao' ? drawDeadCarabao() : drawChicken(v || 0xffffff)).canvas(), false));
   };
 
   // ---------- The ground: one painting, 16 pixels per world unit, reaching g.half units from the middle ----------
@@ -432,6 +389,7 @@
     var X0 = Math.max(0, Math.floor((p.box[0] + H) * 16)), Y0 = Math.max(0, Math.floor((p.box[1] + H) * 16));
     var X1 = Math.min(N, Math.ceil((p.box[2] + H) * 16)), Y1 = Math.min(N, Math.ceil((p.box[3] + H) * 16)), w = X1 - X0, hh = Y1 - Y0;
     var img = ctx.getImageData(X0, Y0, w, hh), d = img.data, old = new Uint8ClampedArray(d);
+    ['graves', 'yards', 'paddy', 'garden', 'roads', 'dry', 'scorch'].forEach(function (n) { p[n] = p[n] || []; });
     function segD(px, pz, a, b) {
       var dx = b[0] - a[0], dz = b[1] - a[1], t = ((px - a[0]) * dx + (pz - a[1]) * dz) / (dx * dx + dz * dz);
       t = t < 0 ? 0 : t > 1 ? 1 : t; var ex = px - a[0] - dx * t, ez = pz - a[1] - dz * t; return Math.sqrt(ex * ex + ez * ez);
@@ -464,6 +422,15 @@
       if (rd < 0) c = h < 0.12 ? 0xb9975f : h > 0.92 ? 0xf0dcae : 0xdcc084;
       else if (rd < 0.2 && h < 0.6 && c < 0) c = 0xa8935a;
       if (c >= 0) { d[k] = (c >> 16) & 255; d[k + 1] = (c >> 8) & 255; d[k + 2] = c & 255; }
+      // War: fields left to dry out, and ground where something has burned.
+      for (i = 0; i < p.dry.length; i++) {
+        r = p.dry[i];
+        if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) { var lum = d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11; d[k] = Math.min(255, lum * 0.92 + 42); d[k + 1] = lum * 0.74 + 26; d[k + 2] = lum * 0.4 + 10; }
+      }
+      for (i = 0; i < p.scorch.length; i++) {
+        r = p.scorch[i]; var sx = x - r[0], sz = z - r[1], sr = r[2] + edge * 1.6;
+        if (sx * sx + sz * sz < sr * sr) { var ash = h > 0.93 ? 70 : 0, kk = sx * sx + sz * sz < sr * sr * 0.45 ? 0.3 : 0.55; d[k] = d[k] * kk + 16 + ash; d[k + 1] = d[k + 1] * kk * 0.85 + 12 + ash; d[k + 2] = d[k + 2] * kk * 0.8 + 12 + ash; }
+      }
     }
     ctx.putImageData(img, X0, Y0); t.needsUpdate = true;
     return { x: X0, y: Y0, img: new ImageData(old, w, hh) };

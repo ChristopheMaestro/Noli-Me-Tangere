@@ -32,14 +32,14 @@
 
 <div id="controls">
   <button id="btnL" class="ibtn" data-ic="rotL"></button>
-  <button id="btnR" class="ibtn" data-ic="rotR"></button>
+  <button id="btnSpeed" class="ibtn">×1</button>
   <button id="btnMute" class="ibtn" data-ic="sound"></button>
 </div>
 
 <div id="title" class="overlay show">
   <div class="titleBox">
     <h1><img id="logo" src="Noli_Me_Tangere.svg" alt="Noli me Tangere" draggable="false"></h1>
-    <h2>Building the School of San Diego</h2>
+    <h2><span id="h2Word">Building<svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><path d="M3 17c14-5 27 3 41-2s24-6 38-1 22-3 35-4M6 21c20-9 38 4 58-3s33 1 52-6"/></svg><em>Defending</em></span> the School of San Diego</h2>
     <div id="menuMain" class="menu">
       <button id="btnContinue">Continue</button>
       <button id="btnPlay">Play</button>
@@ -49,11 +49,22 @@
     <div id="menuOptions" class="menu sub">
       <button id="optSound">Sound: on</button>
       <button id="optErase">Erase saved game</button>
+      <button id="optDebug">Debug mode: off</button>
+      <div id="dbg">
+        <div class="drow"><label><input type="checkbox" id="dbgAuto"><span>Autoclick</span></label><input type="range" id="dbgCps" min="1" max="100" step="1"><b id="dbgCpsT"></b></div>
+        <div class="drow"><span>Stage</span><select id="dbgStage"><option value="build">Construction</option><option value="siege">Tower Defense</option></select></div>
+        <div class="drow"><span>Boss</span><select id="dbgBoss"></select></div>
+        <div class="drow"><span>Shopping spree</span><label class="wide"><input type="checkbox" id="dbgSpree"><span>Buy every bonus, cheapest first</span></label></div>
+        <div class="drow"><span>Standing order</span><select id="dbgOrd"><option value="0">Off</option><option value="1">On (full)</option><option value="2">On (half)</option></select></div>
+        <div class="drow"><span>Resources</span><input type="range" id="dbgMult" min="1" max="10" step="1"><b id="dbgMultT"></b><label><input type="checkbox" id="dbgInf"><span class="inf">∞</span></label></div>
+      </div>
       <button class="back">Back</button>
     </div>
     <div id="menuCredits" class="menu sub">
-      <p>After the novel <i>Noli Me Tangere</i> by José Rizal (Berlin, 1887).</p>
-      <p>All art is drawn in code. 3D rendering by three.js.</p>
+      <p>Version 1.2, released in November 2026.</p>
+      <p>Based on the lore of José Rizal's <i>Noli Me Tangere</i> (1887). We took the liberty of adapting the story to move the hearts of those who, like us, yearn to see a free Philippines.</p>
+      <p>Licensed under the GNU GPL-3.0.</p>
+      <p><a href="https://github.com/ChristopheMaestro/Noli-Me-Tangere/" target="_blank" rel="noopener">github.com/ChristopheMaestro/Noli-Me-Tangere</a></p>
       <button class="back">Back</button>
     </div>
   </div>
@@ -102,6 +113,7 @@
 <script src="js/sprites.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/world.js"></script>
+<script src="js/siege.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 
   var BELL = '<path d="M6 17c1.500-1.500 2-3.500 2-7a4 4 0 0 1 8 0c0 3.500.5 5.500 2 7z" fill="' + GOLD + '"/><circle cx="12" cy="19.500" r="1.500" fill="' + GOLD + '"/><path d="M12 4v2"/>';
   var CUBE = '<path d="M3 9l9-4 9 4v7l-9 4-9-4z" fill="' + STONE + '"/><path d="M3 9l9 4 9-4M12 13v7"/>';
-  var TURN = '<path d="M5 12a7 7 0 1 0 2.200-5.100"/><path d="M3.200 6.900h4v-4"/>';
+  var TURN = '<path d="M5.460 14.500a7 7 0 1 0 1.540-7.400L3.500 10.500"/><path d="M3.500 5.800v4.700h4.700"/>'; // the arc runs on into the arrow's point
   var SPEAKER = '<path d="M4 9.500h3l4-3.500v12l-4-3.500H4z" fill="' + PAPER + '"/>';
 
   var SVG = {
@@ -21,7 +21,6 @@
     play: '<path d="M7 4.500l12 7.500-12 7.500z" fill="' + GREEN + '"/>',
     reset: TURN,
     rotL: TURN,
-    rotR: '<g transform="translate(24 0) scale(-1 1)">' + TURN + '</g>',
     sound: SPEAKER + '<path d="M15 9a4 4 0 0 1 0 6M17.500 6.500a8 8 0 0 1 0 11"/>',
     mute: SPEAKER + '<path d="M15 9.500l5 5M20 9.500l-5 5"/>',
     mouse: '<rect x="7" y="3" width="10" height="18" rx="5" fill="' + PAPER + '"/><path d="M7 10V8a5 5 0 0 1 5-5v7z" fill="' + GOLD + '"/><path d="M7 10h10"/>',
@@ -62,6 +61,13 @@
     pick: '<g stroke="' + INK + '" stroke-width="3.600"><path d="M7 21l7-12"/></g><g stroke="' + WOOD + '" stroke-width="2"><path d="M7 21l7-12"/></g><path d="M4.500 9.500c4-5.500 11-6.500 16.500-2.500-5-.5-9 .5-13 4.500z" fill="' + STONE + '"/>',
     croc: '<path d="M2 15c2-4 6-6 10-5.500l10-1-1.500 3-6 1 6 1 1.500 3-10-.5c-4 1-8 0-10-1z" fill="' + GREEN + '"/><circle cx="10.500" cy="11.500" r="1" fill="' + INK + '" stroke="none"/><path d="M16 12.500l1 1 1-1.200 1 1.200"/>',
     shed: '<path d="M3 10l9-5 9 5z" fill="' + BAMBOO + '"/><path d="M5 10v10M19 10v10M5 15h14"/><path d="M7 15h4v-3H7zM13 15h4v-3h-4z" fill="#d9603a"/>',
+    tower: '<path d="M4 9l8-6 8 6z" fill="' + BAMBOO + '"/><path d="M6.500 9v4M17.500 9v4"/><path d="M5 13h14v2.500H5z" fill="' + WOOD + '"/><path d="M7 15.500L5.500 21.500M17 15.500l1.500 6M6.500 18.500h11"/>',
+    rifle: '<g stroke="' + INK + '" stroke-width="3.800"><path d="M4 19L20 5"/></g><g stroke="' + STONE + '" stroke-width="2"><path d="M11 12.500L20 5"/></g><g stroke="' + WOOD + '" stroke-width="2.400"><path d="M4 19l7-6.500"/></g><path d="M9.500 15.500l2 2"/>',
+    cannon: '<path d="M3 10.500l13-4 1.500 5-13 4z" fill="' + GOLD + '"/><path d="M16 6.500l3-1 1.500 5-3 1"/><circle cx="9" cy="17" r="3.500" fill="' + WOOD + '"/><circle cx="9" cy="17" r="1" fill="' + INK + '" stroke="none"/>',
+    net: '<path d="M4 4h16v16H4z" fill="' + PAPER + '"/><path d="M4 9.300h16M4 14.700h16M9.300 4v16M14.700 4v16"/><circle cx="4" cy="4" r="1.600" fill="' + STONE + '"/><circle cx="20" cy="4" r="1.600" fill="' + STONE + '"/><circle cx="4" cy="20" r="1.600" fill="' + STONE + '"/><circle cx="20" cy="20" r="1.600" fill="' + STONE + '"/>',
+    heart: '<path d="M12 20.500C6 16 3 12.500 3 9a4.500 4.500 0 0 1 9-1.500A4.500 4.500 0 0 1 21 9c0 3.500-3 7-9 11.500z" fill="' + RED + '"/>',
+    flame: '<path d="M12 21.500c-4 0-6.500-2.500-6.500-6 0-3.500 3-5 4-9.500 1.500 1.500 2.500 3 2.500 5 1-.8 1.500-2 1.500-3.500 3 2.500 5 5 5 8 0 3.500-2.500 6-6.500 6z" fill="' + GOLD + '"/><path d="M12 21.500c-1.500 0-2.500-1-2.500-2.500s1.500-2.500 2.500-4c1 1.500 2.500 2.500 2.500 4s-1 2.500-2.500 2.500z" fill="' + RED + '"/>',
+    flag: '<path d="M6 21.500V3"/><path d="M6 4h12l-3 4 3 4H6z" fill="' + RED + '"/>',
     star: '<path d="M12 3l2.700 5.800 6.300.7-4.700 4.300 1.300 6.200-5.600-3.200L6.400 20l1.300-6.200L3 9.500l6.300-.7z" fill="' + GOLD + '"/>'
   };
 
@@ -82,6 +88,10 @@
     fisher: { hat: 'salakot', top: 0x3f8ad8, bottom: 0xf4ecd8 },
     donor: { top: 0xf7c930, bottom: 0x4a4a6a },
     sinang: { robe: 0x2f86e0, stripe: 0xffffff, top: 0xfff6ea, style: 'long' },
+    fili: { hat: 'salakot', top: 0xf4ecd8, bottom: 0x6a4a34, sash: 0xd8222a },
+    bossSacristan: { robe: 0x2a2634, cord: 0xfff6e0, hair: 0x2a1c16, skin: 0xd0a070 },
+    bossConsolacion: { robe: 0x8a2a3a, stripe: 0x2a2634, top: 0xe8463a, style: 'long', hair: 0x1a1420 },
+    bossAlferez: { hat: 'cap', top: 0xf0e8d8, bottom: 0x2a4a9a, shoe: 0x1a1420, sash: 0xf7c930 },
     carabao: 'animal', chicken: 'animal'
   };
   var cache = {};

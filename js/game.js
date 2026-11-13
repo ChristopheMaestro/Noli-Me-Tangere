@@ -10,9 +10,25 @@
   function fresh() {
     var up = {}, res = { pesos: 0 }; D.upgrades.forEach(function (u) { up[u.id] = 0; });
     D.resOrder.forEach(function (r) { res[r] = 0; });
-    return { day: 1, res: res, up: up, boss: 0, last: 0, time: 0, finished: false, auto: {} };
+    return { day: 1, res: res, up: up, boss: 0, last: 0, time: 0, finished: false, auto: {}, sg: null }; // sg: the siege that follows the school (siege.js)
   }
-  function save() { if (botting) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
+  // Debug mode (in the options): its settings are kept apart from the saved game.
+  var DBG_KEY = 'noli-debug', INF = 1e15, paused = false, hush = false;
+  var dbg = { on: false, auto: false, cps: 10, mult: 1, inf: false, spree: false, ord: 0 }, kept = null, keptOf = null, clickAcc = 0, loudAcc = 0;
+  function mult() { return dbg.on && !botting ? dbg.mult : 1; }
+  function save() {
+    if (botting) return;
+    var o = S, k;
+    if (kept && keptOf === S) { o = {}; for (k in S) o[k] = S[k]; o.res = kept; } // endless stores are never written down: the save keeps what was really there
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(o)); } catch (e) { /* storage unavailable */ }
+  }
+  // Endless stores: everything is topped up every frame, and what was there before comes back when the box is unticked.
+  function pin() {
+    var k;
+    if (!(dbg.on && dbg.inf) || botting) { if (kept) { if (keptOf === S) for (k in kept) S.res[k] = kept[k]; kept = keptOf = null; } return; }
+    if (keptOf !== S) { keptOf = S; kept = {}; for (k in S.res) kept[k] = S.res[k]; }
+    for (k in S.res) S.res[k] = INF;
+  }
   function load() {
     try {
       var raw = localStorage.getItem(SAVE_KEY); if (!raw) return null;
@@ -75,6 +91,7 @@
   function spent(k) { return D.upgrades.every(function (u) { return u.id === 'school' || !u.cost[k] || L(u.id) >= u.max; }); } // every bonus paid in this material is bought out
   function fmt(n) {
     n = Math.floor(n + 1e-6);
+    if (n >= INF / 10) return '∞';
     if (n < 100000) return n.toLocaleString('en-US');
     var u = ['K', 'M', 'B', 'T'], i = -1;
     while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
@@ -88,7 +105,7 @@
     return audio;
   }
   function tone(freq, dur, vol, type, when) {
-    if (botting || muted) return;
+    if (botting || muted || hush) return;
     var a = ac(); if (!a) return;
     var o = a.createOscillator(), g = a.createGain(), t = a.currentTime + (when || 0);
     o.type = type || 'sine'; o.frequency.value = freq;
@@ -147,7 +164,7 @@
     var tr = 'translate(' + Math.round(m.x) + 'px,' + Math.round(m.y) + 'px)';
     if (tr !== m.tr) { m.tr = tr; m.el.style.transform = tr; }
   }
-  function bump(m) { m.el.classList.remove('hit'); void m.el.offsetWidth; m.el.classList.add('hit'); }
+  function bump(m) { if (hush) return; m.el.classList.remove('hit'); void m.el.offsetWidth; m.el.classList.add('hit'); }
 
   var spotMarks = {};
   function buildSpots() {
@@ -213,11 +230,10 @@
     showSpots();
   }
 
-  function gain(res, n) { S.res[res] += n; R.gain[res] = (R.gain[res] || 0) + n; }
+  function gain(res, n) { n *= mult(); S.res[res] += n; R.gain[res] = (R.gain[res] || 0) + n; return n; }
   function gather(sp, n) {
     if (R.frenzy > 0) n *= 2;
-    gain(sp.res, n);
-    return n;
+    return gain(sp.res, n);
   }
   function hazardAt(id) { for (var i = 0; i < R.haz.length; i++) if (R.haz[i].spot === id) return R.haz[i]; return null; }
   var BOSS_AT = [-14, 9.5, -14.2]; // over the church door
@@ -226,8 +242,8 @@
   function fire(k, n) {
     n = Math.min(n * (R.frenzy > 0 ? 2 : 1), S.res[k.from]);
     if (n <= 0) return 0;
-    S.res[k.from] -= n; n *= k.gain ? V(k.gain) : 1; gain(k.to, n);
-    return n;
+    S.res[k.from] -= n;
+    return gain(k.to, n * (k.gain ? V(k.gain) : 1));
   }
   function stoke(k) { // one click on a kiln
     if (phase !== 'day' || k.stage > stage()) return;
@@ -284,7 +300,7 @@
     var i = R.haz.indexOf(h); if (i < 0) return;
     R.haz.splice(i, 1);
     var pay = V('gantimpala') * S.last;
-    if (pay > 0) { gain('pesos', pay); floater('+' + fmt(pay), h.mark.x, h.mark.y - 30, 'gold'); }
+    if (pay > 0) { pay = gain('pesos', pay); floater('+' + fmt(pay), h.mark.x, h.mark.y - 30, 'gold'); }
     dropMark(h.mark); friarWalk(); showSpots(); sfxCoin();
     var b = R.boss; // a raid is beaten by seeing off its patrols; the next one comes as soon as the road is clear
     if (b && b.def.rout && b.hp > 0) { if (!R.haz.length) b.next = Math.min(b.next, R.t + D.ROUT_GAP); hurtBoss(1); }
@@ -309,7 +325,7 @@
     var b = R.boss; b.hp -= n; bossBar();
     if (b.hp > 0) return;
     R.won = true; R.wonAt = R.t; S.boss += 1;
-    var prize = Math.max(20, S.last * 0.5); gain('pesos', prize);
+    var prize = gain('pesos', Math.max(20, S.last * 0.5));
     if (!botting) floater('+' + fmt(prize), b.mark.x, b.mark.y - 40, 'crit');
     dropMark(b.mark); b.weak.forEach(function (w) { dropMark(w.mark); }); b.weak = []; sfxWin();
     R.haz.slice().forEach(clearHazard);
@@ -361,7 +377,7 @@
     var i = R.tg.indexOf(t); if (i < 0 || phase !== 'day') return;
     R.tg.splice(i, 1); holdBell(t.mark);
     if (t.kind === 'maria') { R.frenzy = V('maria'); sfxWin(); }
-    else { var g = donorGift(); gain('pesos', g); floater('+' + fmt(g), t.mark.x, t.mark.y - 30, 'gold'); sfxCoin(); }
+    else { var g = gain('pesos', donorGift()); floater('+' + fmt(g), t.mark.x, t.mark.y - 30, 'gold'); sfxCoin(); }
     dropMark(t.mark);
   }
 
@@ -396,6 +412,22 @@
     if (R.t >= dayLen()) endDay();
   }
 
+  // Debug: the autoclicker. It clicks what a player would: an opening, an interruption, a donor, the confrontation, or else the place last worked at.
+  // Only a few of its clicks a second are heard and shown, or a hundred of them would bury the screen.
+  function autoClick(dt) {
+    clickAcc = Math.min(200, clickAcc + dbg.cps * dt);
+    while (clickAcc >= 1 && phase === 'day') {
+      clickAcc -= 1; loudAcc += Math.min(1, 8 / dbg.cps); hush = loudAcc < 1; if (!hush) loudAcc -= 1;
+      var b = R.boss && R.boss.hp > 0 ? R.boss : null;
+      if (b && b.weak.length) hitWeak(b.weak[0]);
+      else if (R.haz.length) hitHazard(R.haz[0]);
+      else if (R.tg.length) collect(R.tg[0]);
+      else if (b && !b.def.rout && !b.shut) hitBoss();
+      else work(cur);
+    }
+    hush = false;
+  }
+
   // ---------- the evening ----------
   function endDay() {
     setPhase('event');
@@ -409,6 +441,12 @@
       var n = S.auto[k] === 1 ? Math.floor(S.res[k] - keep(k)) : 0;
       if (n > 0) { var p = sellPrice(k, n); S.res[k] -= n; S.res.pesos += p; R.sold += p; }
     }
+    // Debug standing order, for every material the shop deals in: everything the next step does not need (full), or half of that (half).
+    if (dbg.on && dbg.ord && !botting) D.resOrder.forEach(function (k) {
+      if (!L('tindahan') || !resOpen(k) || S.auto[k] === 1) return;
+      var n = Math.floor((S.res[k] - keep(k)) / (dbg.ord === 2 ? 2 : 1));
+      if (n > 0) { var p = sellPrice(k, n); S.res[k] -= n; S.res.pesos += p; R.sold += p; }
+    });
     if (botting) return;
     W.ringBell(); sfxBell(); W.setDaylight(1.6); W.setSuspicion(0);
     crew(false);
@@ -416,7 +454,9 @@
   }
 
   // The evening: a title, a line or two, and the day's takings as a plain list.
-  function duskScreen(title, text, rows, next) {
+  var duskGo = null; // what the evening's button does, when it is not the tree
+  function duskScreen(title, text, rows, next, go) {
+    duskGo = go || null;
     $('duskTitle').textContent = title; $('duskText').textContent = text; $('duskNext').textContent = next;
     $('duskList').innerHTML = rows.map(function (r) { return '<li class="' + (r[3] || '') + '">' + I(r[0]) + '<b>' + r[1] + '</b><span>' + r[2] + '</span></li>'; }).join('');
     $('dusk').classList.add('show');
@@ -437,7 +477,7 @@
   function showEnding() {
     var mins = Math.round(S.time / 60 + S.day * 0.25);
     hide('tree'); hide('shop'); setPhase('event'); R = null; sfxWin();
-    duskScreen('The School of San Diego', D.ending, [['sun', S.day - 1, 'days of work'], ['bell', mins, 'minutes, more or less']], 'Stay in San Diego');
+    duskScreen('The School of San Diego', D.ending, [['sun', S.day - 1, 'days of work'], ['bell', mins, 'minutes, more or less']], 'And then…', function () { Noli.Siege.enter(); });
   }
 
   // ---------- the night: the tree of bonuses ----------
@@ -510,7 +550,7 @@
       var s = Math.floor(l / D.STEPS);
       lines.push([D.stages[s].note], ['Step ' + (l % D.STEPS + 1) + ' of ' + D.STEPS + ' towards "' + D.stages[s + 1].name + '"', 'k']);
       lines = lines.concat(billLines(bill()));
-      if (l === MAXSTEP - 1) lines.push(['The last step: paying for it finishes the school and ends the game.', 'k2']);
+      if (l === MAXSTEP - 1) lines.push(['The last step: paying for it finishes the school and closes this tree. Buy everything else first.', 'k2']);
       if (bossDue()) lines.push([I(D.bosses[S.boss].icon) + D.bosses[S.boss].name + ' stands in the way. Confront it first.', 'bad']);
       return tipHtml(u.name + ' <i>' + l + '/' + u.max + '</i>', lines);
     }
@@ -555,7 +595,7 @@
   function buy(u, many, sure) {
     var bought = 0, before = stage();
     if (u.id === 'school' && L('school') === MAXSTEP - 1 && buyable(u) && sure !== true) {
-      ask('The last step', 'Paying for it finishes the school, and with it the game.\nYou can stay on in San Diego afterwards and go on playing.', 'Finish the school', 'Not yet', function () { buy(u, false, true); });
+      ask('The last step', 'Paying for it finishes the school, and the building is over: the tree of bonuses closes for good.\nBuy every bonus you still want first, and hire every worker. They are all you will have for what comes after.', 'Finish the school', 'Not yet', function () { buy(u, false, true); });
       return;
     }
     do {
@@ -572,12 +612,39 @@
     crew(false);
   }
 
+  // Debug "shopping spree": buy the bonuses one by one, cheapest first, topping up what is missing at the shop with pesos. The school itself is never bought.
+  function spree() {
+    var shop = L('tindahan') > 0, again = true, guard = 0, bought = 0;
+    function worth(c) { var v = 0; for (var k in c) v += k === 'pesos' ? c[k] : c[k] * unitPrice(k) * D.SHOP_BUY; return v; }
+    function toppedUp(c) { // the pesos needed once what is missing is bought at the shop, or -1 if it cannot be
+      var p = c.pesos || 0;
+      for (var k in c) { if (k === 'pesos') continue; var m = Math.max(0, Math.ceil(c[k] - S.res[k])); if (m) { if (!shop || !resOpen(k)) return -1; p += buyPrice(k, m); } }
+      return p <= S.res.pesos ? p : -1;
+    }
+    while (again && guard++ < 2000) {
+      again = false;
+      var best = null, bv = Infinity;
+      D.upgrades.forEach(function (u) {
+        if (u.id === 'school' || nodeState(u) !== 'open') return;
+        var c = cost(u), v = worth(c);
+        if (v < bv && toppedUp(c) >= 0) { best = u; bv = v; }
+      });
+      if (!best) break;
+      var c = cost(best);
+      for (var k in c) { if (k === 'pesos') continue; var m = Math.max(0, Math.ceil(c[k] - S.res[k])); if (m) { S.res.pesos -= buyPrice(k, m); S.res[k] += m; } }
+      pay(c); S.up[best.id] += 1; bought++; again = true;
+    }
+    if (bought) { save(); sfxBuy(); updateTree(); crew(false); }
+  }
+
   function showTree() {
+    if (S.finished) { hide('title'); hide('shop'); hide('tree'); R = null; Noli.Siege.enter(); return; } // the building is over: what is left is to defend it
     setPhase('tree');
     hide('dusk'); hide('title'); hide('shop');
     if (R) { S.day += 1; R = null; }
     W.setDaylight(1.6); crew(false);
     save(); updateTree(); centerTree();
+    if (dbg.on && dbg.spree && !botting) spree();
     $('tree').classList.add('show');
   }
 
@@ -644,6 +711,8 @@
   function put(el, text) { if (el._t !== text) { el._t = text; el.textContent = text; } }
   function wide(el, pct) { pct = pct.toFixed(1) + '%'; if (el._w !== pct) { el._w = pct; el.style.width = pct; } }
   function hud() {
+    if (S.sg) { W.setSchool(D.stages.length - 1, 0); W.setHouses(S.sg.houses); Noli.Siege.hud(); return; }
+    Noli.Siege.off();
     var b = bill(), sum = 0, n = 0, k;
     for (k in b) { sum += Math.min(1, S.res[k] / b[k]); n++; }
     put($('hudDay'), 'Day ' + S.day);
@@ -671,19 +740,22 @@
 
   function hudTips() {
     tip($('chipDay'), function () {
+      if (S.sg) return Noli.Siege.tipOf('day');
       return tipHtml('Day ' + S.day, [[phase === 'day' ? 'The Angelus rings in ' + Math.ceil(dayLen() - R.t) + ' seconds and work stops.' : 'Night. A day lasts ' + baseLen() + ' seconds.']]);
     });
     tip($('chipStage'), function () {
+      if (S.sg) return Noli.Siege.tipOf('stage');
       var s = stage();
       if (L('school') >= MAXSTEP) return tipHtml(D.stages[s].name, [[D.stages[s].note]]);
       return tipHtml(D.stages[s].name, [[D.stages[s].note], ['The next step needs:', 'k']].concat(billLines(bill())).concat([['Pay for it at night, at the centre of the tree.']]));
     });
     tip($('chipPesos'), function () {
+      if (S.sg) return Noli.Siege.tipOf('pesos');
       return tipHtml('Pesos', [['The town gives ' + fmt(pesoRate() * baseLen()) + ' pesos a day while the works go on, and more with every step of the school. Spend them at night on the tree of bonuses.']]);
     });
     tip($('buff'), tipHtml('María Clara is watching', [['Everything gathered is doubled.', 'good']]));
-    tip($('btnL'), tipHtml('Turn the view', [['Q']]));
-    tip($('btnR'), tipHtml('Turn the view', [['E']]));
+    tip($('btnL'), tipHtml('Turn the view', [['Q, or E the other way. Drag the map to move it, or use the arrow keys.']]));
+    tip($('btnSpeed'), function () { return tipHtml('Speed', [[speed === 1 ? 'Time runs as usual.' : 'Time runs ' + speed + ' times as fast.'], ['Click for ' + (speed === 1 ? '×2' : speed === 2 ? '×5' : '×1') + '.']]); });
     tip($('btnMute'), function () { return tipHtml(muted ? 'Sound is off' : 'Sound is on'); });
     tip($('shopBtn'), tipHtml('The shop', [['Sell what you have too much of, buy what you lack.']]));
     tip($('nextDay'), function () { return tipHtml('Dawn', [['Begin day ' + S.day + ', an ordinary working day.']]); });
@@ -703,7 +775,7 @@
     toastTimer = setTimeout(function () { $('toast').classList.remove('show'); }, 3200);
   }
   function floater(text, x, y, cls) {
-    if (botting) return;
+    if (botting || hush) return;
     var el = document.createElement('div'); el.className = 'floater ' + (cls || ''); el.textContent = text;
     el.style.left = x + 'px'; el.style.top = y + 'px';
     $('floaters').appendChild(el); setTimeout(function () { el.remove(); }, 800);
@@ -778,16 +850,61 @@
     var saved = load();
     S = saved || fresh();
     buildTree(); buildHud(); buildSpots(); hudTips();
+    Noli.Siege.init({ s: function () { return S; }, put: function (s) { S = s; R = null; }, fresh: fresh, save: save, phase: setPhase, now: function () { return phase; }, tip: tip, tipHtml: tipHtml, drawTip: drawTip, fmt: fmt, toast: toast,
+      floater: floater, tone: tone, mult: mult, dusk: duskScreen, hide: hide, crew: crew, put2: put, wide: wide, sfx: { buy: sfxBuy, no: sfxNo, hit: sfxHit, coin: sfxCoin, win: sfxWin, bell: sfxBell } });
 
+    var menuCur = 'menuMain';
     function menu(id) {
+      menuCur = id;
       ['menuMain', 'menuOptions', 'menuCredits'].forEach(function (m) { $(m).style.display = m === id ? 'flex' : 'none'; });
+      if (id === 'menuOptions') dbgDraw();
     }
+    // Esc, in the middle of a game: the same menu, with the game stopped behind it.
+    function pause() {
+      paused = true; document.body.classList.add('paused'); held = {}; tipCur = null; drawTip();
+      menu('menuMain'); hasSave(); $('title').classList.add('show');
+    }
+    function resume() { paused = false; document.body.classList.remove('paused'); hide('title'); }
+
+    // Debug mode: an autoclicker, a jump to any confrontation of either part of the game, and stores multiplied or endless.
+    try { var d0 = JSON.parse(localStorage.getItem(DBG_KEY) || '{}'); for (var dk in dbg) if (typeof d0[dk] === typeof dbg[dk]) dbg[dk] = d0[dk]; } catch (e) { /* storage unavailable */ }
+    function dbgKeep() { try { localStorage.setItem(DBG_KEY, JSON.stringify(dbg)); } catch (e) { /* storage unavailable */ } }
+    function dbgDraw(keepBoss) {
+      var war = !!(S.finished || S.sg), list = war ? D.siege.bosses : D.bosses, sel = $('dbgBoss');
+      $('optDebug').textContent = 'Debug mode: ' + (dbg.on ? 'on' : 'off'); $('dbg').classList.toggle('show', dbg.on);
+      $('dbgAuto').checked = dbg.auto; $('dbgCps').value = dbg.cps; $('dbgCps').disabled = !dbg.auto; $('dbgCpsT').textContent = dbg.cps + ' a second';
+      $('dbgMult').value = dbg.mult; $('dbgMult').disabled = dbg.inf; $('dbgMultT').textContent = '×' + dbg.mult; $('dbgInf').checked = dbg.inf;
+      $('dbgSpree').checked = dbg.spree; $('dbgOrd').value = String(dbg.ord);
+      $('dbgStage').value = war ? 'siege' : 'build';
+      if (keepBoss === true && sel._war === war) return;
+      sel._war = war;
+      sel.innerHTML = '<option value="">Choose a boss</option>' + list.map(function (b, i) { return '<option value="' + i + '">' + (i + 1) + '. ' + b.name + '</option>'; }).join('');
+    }
+    // Put the game on the night before confrontation i of one part or the other (i < 0: at the very start of that part). The bonuses bought stay as they are.
+    function jump(war, i) {
+      marks.slice().forEach(function (m) { if (m.el.className.indexOf('spot') < 0) dropMark(m); });
+      R = null; asking = null; ['dusk', 'tree', 'shop', 'ask'].forEach(hide);
+      if (war) { S.up.school = MAXSTEP; S.finished = true; S.boss = D.bosses.length; if (i < 0) S.sg = null; else Noli.Siege.jump(i); }
+      else { S.sg = null; S.finished = false; S.up.school = i < 0 ? 0 : i * D.STEPS + D.STEPS - 1; S.boss = Math.max(0, i); }
+      paused = false; document.body.classList.remove('paused'); setPhase('title'); $('title').classList.add('show');
+      W.setDaylight(0); W.setSuspicion(0); crew(false);
+      save(); saved = S; hasSave(); dbgDraw(true);
+    }
+    $('optDebug').onclick = function () { dbg.on = !dbg.on; dbgKeep(); dbgDraw(); };
+    $('dbgAuto').onchange = function () { dbg.auto = this.checked; dbgKeep(); dbgDraw(true); };
+    $('dbgCps').oninput = function () { dbg.cps = +this.value; dbgKeep(); dbgDraw(true); };
+    $('dbgMult').oninput = function () { dbg.mult = +this.value; dbgKeep(); dbgDraw(true); };
+    $('dbgInf').onchange = function () { dbg.inf = this.checked; dbgKeep(); dbgDraw(true); };
+    $('dbgSpree').onchange = function () { dbg.spree = this.checked; dbgKeep(); dbgDraw(true); if (dbg.on && dbg.spree && phase === 'tree') spree(); };
+    $('dbgOrd').onchange = function () { dbg.ord = +this.value; dbgKeep(); dbgDraw(true); };
+    $('dbgStage').onchange = function () { jump(this.value === 'siege', -1); };
+    $('dbgBoss').onchange = function () { if (this.value !== '') jump($('dbgStage').value === 'siege', +this.value); };
     function setMuted(m) {
       muted = m; $('btnMute').innerHTML = I(muted ? 'mute' : 'sound'); $('optSound').textContent = 'Sound: ' + (muted ? 'off' : 'on'); drawTip();
     }
-    function hasSave() { $('btnContinue').style.display = saved ? 'block' : 'none'; $('optErase').disabled = !saved; }
+    function hasSave() { $('btnContinue').style.display = saved || paused ? 'block' : 'none'; $('btnPlay').style.display = paused ? 'none' : ''; $('optErase').disabled = !saved && !paused; }
     menu('menuMain'); hasSave();
-    $('btnContinue').onclick = function () { ac(); showTree(); };
+    $('btnContinue').onclick = function () { ac(); if (paused) resume(); else showTree(); };
     $('btnPlay').onclick = function () {
       var go = function () { ac(); S = fresh(); R = null; save(); startDay(); };
       if (saved) ask('A new game', 'This erases your saved school.', 'Start over', 'Keep it', go); else go();
@@ -801,25 +918,50 @@
     $('optErase').onclick = function () {
       ask('Erase the save', 'Your saved school will be gone for good.', 'Erase it', 'Keep it', function () {
         try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* storage unavailable */ }
-        saved = null; S = fresh(); hasSave();
+        marks.slice().forEach(function (m) { if (m.el.className.indexOf('spot') < 0) dropMark(m); });
+        ['dusk', 'tree', 'shop'].forEach(hide);
+        saved = null; S = fresh(); R = null; paused = false; document.body.classList.remove('paused'); setPhase('title'); W.setDaylight(0); W.setSuspicion(0); crew(false);
+        hasSave(); dbgDraw();
       });
     };
-    $('duskNext').onclick = showTree;
+    $('duskNext').onclick = function () { var go = duskGo; duskGo = null; if (go) go(); else showTree(); };
     $('shopBtn').onclick = function () { if (tv.moved <= 6 && L('tindahan')) showShop(); };
     $('shopBack').onclick = function () { hide('shop'); };
     $('nextDay').onclick = function () { if (tv.moved <= 6) startDay(); };
     $('bossBtn').onclick = function () { if (tv.moved <= 6 && bossDue()) startDay(true); };
     $('btnMute').onclick = function () { setMuted(!muted); this.blur(); };
     $('btnL').onclick = function () { W.rotate(1); this.blur(); };
-    $('btnR').onclick = function () { W.rotate(-1); this.blur(); };
+    $('btnSpeed').onclick = function () { speed = speed === 1 ? 2 : speed === 2 ? 5 : 1; this.textContent = '×' + speed; this.classList.toggle('fast', speed > 1); this.blur(); drawTip(); };
     canvas.addEventListener('wheel', function (e) { W.zoom(e.deltaY); e.preventDefault(); }, { passive: false });
+    // Drag the map to move it. W.dragged tells a click that ends a drag from a plain one.
+    var drag = null;
+    canvas.addEventListener('pointerdown', function (e) { if (e.button === 0) { drag = { x: e.clientX, y: e.clientY, far: 0 }; W.dragged = false; } });
+    window.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.far += Math.abs(dx) + Math.abs(dy);
+      if (drag.far > 6) { W.dragged = true; W.pan(dx, dy); canvas.classList.add('grab'); }
+    });
+    var drop = function () { drag = null; canvas.classList.remove('grab'); };
+    window.addEventListener('pointerup', drop); window.addEventListener('pointercancel', drop);
+    var held = {}, ARROWS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+    window.addEventListener('keyup', function (e) { held[e.code] = false; });
+    panKeys = function (dt) { for (var k in ARROWS) if (held[k]) W.pan(ARROWS[k][0] * 700 * dt, ARROWS[k][1] * 700 * dt); };
     window.addEventListener('keydown', function (e) {
+      var shopOpen = $('shop').classList.contains('show');
+      if (e.code === 'Escape') { // a question first, then whatever is open or in hand, and otherwise the menu
+        if (asking) answer(false);
+        else if (menuCur !== 'menuMain' && (paused || phase === 'title')) menu('menuMain');
+        else if (paused) resume();
+        else if (phase === 'title') return;
+        else if (shopOpen) hide('shop');
+        else if (!Noli.Siege.esc()) pause();
+        return;
+      }
+      if (paused || /^(INPUT|SELECT)$/.test(e.target.tagName || '')) return;
+      if (ARROWS[e.code] && phase !== 'title' && phase !== 'tree' && phase !== 'siegeNight') { held[e.code] = true; e.preventDefault(); }
       if (e.code === 'KeyQ') W.rotate(1);
       if (e.code === 'KeyE') W.rotate(-1);
-      var shopOpen = $('shop').classList.contains('show');
-      if (e.code === 'Escape' && asking) { answer(false); return; }
-      if (e.code === 'Escape' && shopOpen) hide('shop');
-      else if (e.code === 'Enter' && phase === 'event') showTree();
+      if (e.code === 'Enter' && phase === 'event') $('duskNext').click();
       else if (e.code === 'Enter' && phase === 'tree' && !shopOpen) startDay();
     });
     document.addEventListener('mouseover', function (e) {
@@ -832,6 +974,7 @@
     // Debug: index.html?auto=1&step=9 jumps into a day with nine building steps done. auto=tree opens the tree, auto=dusk an evening,
     // boss=1 makes it a confrontation, up=2 sets every bonus to level 2, rich=1 fills the stores. bot=4 plays the whole game at 4 clicks a second.
     var q = new URLSearchParams(location.search);
+    if (q.get('sbot')) { W.update(0.016); Noli.Siege.bot(+q.get('sbot')); }
     if (q.get('bot')) { W.update(0.016); q.get('bot').split(',').forEach(function (c) { runBot(+c); }); }
     if (q.get('auto')) {
       S = fresh();
@@ -841,7 +984,8 @@
       if (q.get('day')) S.day = +q.get('day');
       S.last = 200;
       W.update(0.016);
-      if (q.get('auto') === 'tree') showTree();
+      if (q.get('auto') === 'siege') Noli.Siege.debug(q); // siege.js lists what it takes
+      else if (q.get('auto') === 'tree') showTree();
       else if (q.get('auto') === 'shop') { showTree(); showShop(); }
       else if (q.get('auto') === 'ask') { showTree(); D.resOrder.concat(['pesos']).forEach(function (k) { S.res[k] = 1e9; }); S.boss = D.bosses.length; updateTree(); buy(byId.school); }
       else {
@@ -851,6 +995,11 @@
       }
       if (q.get('hover')) { tipCur = nodeEls[q.get('hover')] || $(q.get('hover')); var rc = tipCur.getBoundingClientRect(); tipX = rc.right - 10; tipY = rc.bottom - 10; }
     }
+
+    // Debug: menu=options or menu=credits opens that page of the title; menu=pause opens the Esc menu; dbgon=1 turns debug mode on.
+    if (q.get('dbgon')) { dbg.on = true; }
+    if (q.get('menu') === 'pause') pause();
+    else if (q.get('menu')) { menu(q.get('menu') === 'credits' ? 'menuCredits' : 'menuOptions'); }
 
     // Show the title only when the lettering, the logo and the first picture of the town are all there, so nothing pops in piece by piece.
     hud(); W.update(0.016);
@@ -865,8 +1014,14 @@
     var last = performance.now(), tipClock = 0;
     function frame(now) {
       var dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
-      if (phase === 'day' && !lockT) tickDay(dt);
-      hud(); W.update(dt, phase === 'tree');
+      for (var n = 0; n < speed; n++) { // the speed button: time is run two or five times over, in the same small steps
+        if (paused || lockT) break;
+        if (phase === 'day') { if (dbg.on && dbg.auto) autoClick(dt); tickDay(dt); }
+        else if (phase === 'siege') Noli.Siege.tick(dt);
+      }
+      pin();
+      var war = !!(S.finished || S.sg) || titleWar, word = $('h2Word'); if (word._w !== war) { word._w = war; word.classList.toggle('war', war); } // the title, once the school is built
+      panKeys(dt); hud(); W.update(dt, phase === 'tree' || phase === 'siegeNight' || paused);
       tipClock += dt;
       if (tipClock > 0.25) {
         tipClock = 0; if (tipCur) drawTip(); if (phase === 'day') showSpots();
@@ -877,6 +1032,8 @@
     requestAnimationFrame(frame);
   }
   var lockT = false; // debug: freeze the day for screenshots
+  var titleWar = /[?&]title=war/.test(location.search); // debug: the title as it reads once the school is built
+  var speed = 1, panKeys = function () {}; // speed: 1, 2 or 5 times, from the button beside the view
 
   window.addEventListener('error', function (e) { var b = $('err'); if (b) { b.style.display = 'block'; b.textContent = 'Error: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'; } });
   window.addEventListener('DOMContentLoaded', boot);
