@@ -316,8 +316,38 @@
     var G = [0x4f9f3e, 0x62b548, 0x7fcb55], GD = G.map(function (c) { return dk(c, 0.2); }), GL = G.map(function (c) { return lt(c, 0.25); });
     var F = [0x2f7a3c, 0x3f8f44], FL = [0xfff2a0, 0xffffff, 0xff7ab0, 0xff5a4a, 0xc58cff];
     var PV = [0xe8d6a8, 0xdcc898, 0xf0e0b8];
-    for (var py = 0; py < N; py++) for (var px = 0; px < N; px++) {
-      var x = px / 16 - H, z = py / 16 - H, h = hash(px, py), n = vnoise(x * 0.22 + 40, z * 0.22 + 40), n2 = vnoise(x * 0.9 + 7, z * 0.9 + 3);
+    // Four million pixels: what can be worked out once is worked out here. The two noises are read from tables of their corner
+    // values (the same numbers as vnoise gives, without eight sines a pixel), and a road or a reach of the river is only measured
+    // from inside a box drawn round it, since further off than that it changes nothing.
+    function table(f, ox, oy) {
+      var x0 = Math.floor(ox - H * f) - 1, y0 = Math.floor(oy - H * f) - 1, w = Math.ceil(2 * H * f) + 4, t = new Float64Array(w * w);
+      for (var j = 0; j < w; j++) for (var i = 0; i < w; i++) t[j * w + i] = hash(x0 + i, y0 + j);
+      // where each column and each row of pixels falls among those corners, and how far between two of them
+      var cx = new Int32Array(N), sx = new Float64Array(N), cy = new Int32Array(N), sy = new Float64Array(N), v;
+      for (i = 0; i < N; i++) {
+        v = (i / 16 - H) * f + ox; j = Math.floor(v); cx[i] = j - x0; v -= j; sx[i] = v * v * (3 - 2 * v);
+        v = (i / 16 - H) * f + oy; j = Math.floor(v); cy[i] = (j - y0) * w; v -= j; sy[i] = v * v * (3 - 2 * v);
+      }
+      return { t: t, w: w, cx: cx, sx: sx, cy: cy, sy: sy };
+    }
+    function boxOf(a, b, pad) { return [Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad]; }
+    var wide = table(0.22, 40, 40), fine = table(0.9, 7, 3);
+    var wt = wide.t, ww = wide.w, wcx = wide.cx, wsx = wide.sx, wcy = wide.cy, wsy = wide.sy, ft = fine.t, fw = fine.w, fcx = fine.cx, fsx = fine.sx, fcy = fine.cy, fsy = fine.sy;
+    var out = new Uint32Array(d.buffer), little = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1; // a pixel written in one go, where the machine's bytes run the usual way
+    var roadBox = g.roads.map(function (r) { return boxOf(r[0], r[1], r[2] / 2 + 0.5); });
+    var riverBox = g.river.slice(1).map(function (p, k) { return boxOf(g.river[k], p, 2.4); });
+    // One box round everything that is not grass or wood: outside it, two pixels in three, none of it is looked at.
+    var U = [g.cem[0] - 4, g.cem[1] - 4, g.cem[0] + 4, g.cem[1] + 4];
+    function grow(b) { U[0] = Math.min(U[0], b[0]); U[1] = Math.min(U[1], b[1]); U[2] = Math.max(U[2], b[2]); U[3] = Math.max(U[3], b[3]); }
+    function round(p, r) { grow([p[0] - r, p[1] - r, p[0] + r, p[1] + r]); }
+    round(g.site, 5.6); round(g.pile, 3.4); round(g.quarry, 4.3); round(g.clay, 3.6); round(g.lake, g.lake[2] + 2.8); g.yards.forEach(function (p) { round(p, 3.3); });
+    grow(g.paddy); grow(g.plaza); roadBox.forEach(grow); riverBox.forEach(grow);
+    var ux0 = U[0], uz0 = U[1], ux1 = U[2], uz1 = U[3];
+    // (One row of pixels at a time, in a function of its own: the browser only makes fast code of a loop that it can leave by the door.)
+    function row(py) { var bx, q, u, v, e0, e1, e2, e3; for (var px = 0; px < N; px++) {
+      var x = px / 16 - H, z = py / 16 - H, h = Math.sin(px * 127.1 + py * 311.7) * 43758.5453, n, n2; h -= Math.floor(h); // (hash, written out)
+      q = wcy[py] + wcx[px]; u = wsx[px]; v = wsy[py]; e0 = wt[q]; e1 = wt[q + 1]; e2 = wt[q + ww]; e3 = wt[q + ww + 1]; n = e0 + (e1 - e0) * u + (e2 - e0) * v + (e0 - e1 - e2 + e3) * u * v;
+      q = fcy[py] + fcx[px]; u = fsx[px]; v = fsy[py]; e0 = ft[q]; e1 = ft[q + 1]; e2 = ft[q + fw]; e3 = ft[q + fw + 1]; n2 = e0 + (e1 - e0) * u + (e2 - e0) * v + (e0 - e1 - e2 + e3) * u * v;
       var a = 255, c, i, gi = n + (h - 0.5) * 0.18, rim = (H - Math.max(Math.abs(x), Math.abs(z))) / 10;
       if (rim < 1) gi = 0.5 + (gi - 0.5) * rim; // fade to plain grass at the rim, where the painting meets the open country
       var gk = gi < 0.38 ? 0 : gi < 0.62 ? 1 : 2;
@@ -327,6 +357,7 @@
       if (!inWood && n2 > 0.6 && h > 0.9 && h < 0.94) c = FL[(px * 7 + py * 13) % 5];
       if (x - z > 50 && rim > 0.6) c = gi < 0.5 ? 0x4a8a5a : 0x5a9a66;
 
+      if (x > ux0 && x < ux1 && z > uz0 && z < uz1) {
       // Cemetery, works site, stockpile.
       if (Math.abs(x - g.cem[0]) < 3.4 && Math.abs(z - g.cem[1]) < 2.9) c = gi < 0.45 ? 0x6f8f4a : (h > 0.95 ? 0xb8a878 : 0x86a055);
       var edge = (n2 - 0.5) * 0.7;
@@ -352,7 +383,7 @@
 
       // Roads.
       var rd = 99;
-      if (x > -37 && x < 24 && z > -16 && z < 22) for (i = 0; i < g.roads.length; i++) { var rr = segD(x, z, g.roads[i][0], g.roads[i][1]) - g.roads[i][2] / 2; if (rr < rd) rd = rr; }
+      if (x > -37 && x < 24 && z > -16 && z < 22) for (i = 0; i < g.roads.length; i++) { bx = roadBox[i]; if (x < bx[0] || z < bx[1] || x > bx[2] || z > bx[3]) continue; var rr = segD(x, z, g.roads[i][0], g.roads[i][1]) - g.roads[i][2] / 2; if (rr < rd) rd = rr; }
       rd += (n2 - 0.5) * 0.3;
       if (rd < 0) c = h < 0.12 ? 0xb9975f : h > 0.92 ? 0xf0dcae : 0xdcc084;
       else if (rd < 0.2 && h < 0.6) c = 0xa8935a;
@@ -367,15 +398,17 @@
 
       // Lake and river: banks, sand, then open water.
       var lx = x - g.lake[0], lz = z - g.lake[1], dl = Math.sqrt(lx * lx + lz * lz) - g.lake[2] + (n - 0.5) * 1.6, dr = 99;
-      if (x > -24 && z > -28) for (i = 0; i < g.river.length - 1; i++) { var r2 = segD(x, z, g.river[i], g.river[i + 1]); if (r2 < dr) dr = r2; }
+      if (x > -24 && z > -28) for (i = 0; i < g.river.length - 1; i++) { bx = riverBox[i]; if (x < bx[0] || z < bx[1] || x > bx[2] || z > bx[3]) continue; var r2 = segD(x, z, g.river[i], g.river[i + 1]); if (r2 < dr) dr = r2; }
       dr -= 1.15 + (n - 0.5) * 0.5;
       if (dr < 0.7 && dr >= 0) c = (h > 0.85) ? 0x8fd45a : (dr < 0.25 ? 0xb89f6a : 0x3f9a3a);
       if (dl < 1.7 && dl >= 0) c = dl < 0.25 ? 0xc2a872 : (dl > 1.3 && h < 0.5) ? c : (h > 0.9 ? 0xfff2cc : h < 0.1 ? 0xdcc88c : 0xeeddaa);
       if (dl < 0 || dr < 0) { a = 0; c = 0x2f9ad8; }
+      }
 
-      var k = (py * N + px) * 4;
-      d[k] = (c >> 16) & 255; d[k + 1] = (c >> 8) & 255; d[k + 2] = c & 255; d[k + 3] = a;
-    }
+      if (little) out[py * N + px] = a << 24 | (c & 255) << 16 | (c & 0xff00) | c >> 16;
+      else { var k = (py * N + px) * 4; d[k] = (c >> 16) & 255; d[k + 1] = (c >> 8) & 255; d[k + 2] = c & 255; d[k + 3] = a; }
+    } }
+    for (var py = 0; py < N; py++) row(py);
     ctx.putImageData(img, 0, 0);
     var t = new T.CanvasTexture(cv);
     t.magFilter = T.NearestFilter; t.minFilter = T.LinearMipmapLinearFilter; t.encoding = T.sRGBEncoding;

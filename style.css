@@ -16,6 +16,15 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2742; color: var(--ink);
   font-family: 'Almendra', Georgia, 'Times New Roman', serif; user-select: none; }
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+/* While the town is painted the page can do nothing else, so the line under the words is moved by a transform, which the browser keeps going by itself. */
+#loading { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #1d2742;
+  color: var(--cream); font-size: 26px; font-style: italic; letter-spacing: .04em; transition: opacity .5s, visibility 0s .5s; }
+#loading img { width: min(300px, 60vw); height: auto; margin-bottom: 8px; }
+#loading span { font-size: 20px; }
+#loading i { display: block; width: 220px; height: 2px; background: rgba(255, 246, 220, .22); overflow: hidden; }
+#loading i::after { content: ''; display: block; width: 40%; height: 100%; background: var(--sun); animation: loading 1.1s ease-in-out infinite alternate; }
+@keyframes loading { from { transform: translateX(0); } to { transform: translateX(150%); } }
+body.ready #loading { opacity: 0; visibility: hidden; pointer-events: none; }
 button { font-family: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: default; }
 
@@ -152,6 +161,9 @@ body[data-phase=day] #marks { display: block; }
 .overlay.show { display: flex; }
 
 #title { background: radial-gradient(ellipse at center, rgba(20, 24, 44, .25), rgba(20, 24, 44, .75)); }
+/* A menu taller than the screen (the debug options, on a small one) is scrolled. The box is centred by its margins, not by the overlay, so that its top is not cut off when it does not fit. */
+#title { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 246, 220, .45) transparent; }
+#title .titleBox { margin: auto; }
 .titleBox { text-align: center; color: var(--cream); text-shadow: 0 3px 0 rgba(0, 0, 0, .55), 0 0 30px rgba(0, 0, 0, .6); opacity: 0; transition: opacity .4s; }
 /* The whole title appears at once, when everything it needs has loaded. */
 body.ready .titleBox { opacity: 1; }
@@ -174,7 +186,7 @@ h2 { margin: 8px 0 26px; font-size: 26px; font-weight: normal; letter-spacing: .
 .menu a:hover { border-bottom-color: var(--sun); }
 /* The menu over a game in progress (Esc): the same lettering, and everything else of the game put away until it is closed. */
 body.paused #title { background: radial-gradient(ellipse at center, rgba(20, 24, 44, .55), rgba(20, 24, 44, .88)); }
-body.paused #hud, body.paused #controls, body.paused #marks, body.paused #sgBar, body.paused #sgFili, body.paused #hint, body.paused #buff, body.paused #toast, body.paused #floaters,
+body.paused #hud, body.paused #controls, body.paused #marks, body.paused #warMarks, body.paused #warBar, body.paused #sgBar, body.paused #sgFili, body.paused #hint, body.paused #buff, body.paused #toast, body.paused #floaters,
 body.paused .overlay:not(#title):not(#ask) { display: none !important; }
 /* Debug mode, in the options: rows of lettering, sliders that are a thin rule, tick boxes that are a small outline. */
 #dbg { display: none; flex-direction: column; align-items: center; gap: 7px; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255, 246, 220, .35); font-size: 19px; font-style: italic; text-shadow: var(--edge); }
@@ -339,7 +351,7 @@ body.siege[data-phase=siege] #scene { cursor: crosshair; }
 #tree2Edges line { stroke: #c9a23a; stroke-width: 7; stroke-linecap: round; }
 #tree2Edges line.dim { stroke: #6a4a52; stroke-dasharray: 2 13; }
 #tree2Bar { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; }
-.node.s-men { --c: #ff6a4a; } .node.s-post { --c: var(--crew); } .node.s-arms { --c: var(--hand); } .node.s-town { --c: var(--stone); } .node.s-chest { --c: var(--money); } .node.s-friend { --c: var(--shadow); }
+.node.s-men { --c: #ff6a4a; } .node.s-post { --c: var(--crew); } .node.s-arms { --c: var(--hand); } .node.s-town { --c: var(--stone); } .node.s-chest { --c: var(--money); } .node.s-friend { --c: var(--shadow); } .node.s-kkk { --c: #d2281e; }
 
 /* The view: drag to move the map */
 #scene { touch-action: none; }
@@ -347,11 +359,104 @@ body.siege[data-phase=siege] #scene { cursor: crosshair; }
 #btnSpeed { font-size: 19px; font-weight: 700; color: #2e2318; font-variant-numeric: tabular-nums; }
 #btnSpeed.fast { background: var(--sun); }
 
-/* The title once the school stands: "Building" struck out in red, "Defending" written over it */
-#h2Word { position: relative; display: inline-block; }
-#h2Word svg, #h2Word em { display: none; }
-#h2Word.war svg { display: block; position: absolute; left: -8%; top: 0; width: 116%; height: 100%; overflow: visible; pointer-events: none; }
-#h2Word.war svg path { fill: none; stroke: #d2281e; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-#h2Word.war em { display: block; position: absolute; left: 50%; bottom: 80%; transform: translateX(-50%) rotate(-5deg); font-size: 31px; font-weight: 700; color: #140d0a; white-space: nowrap;
-  text-shadow: 0 0 2px var(--cream), 0 0 4px var(--cream), 0 0 8px var(--cream), 0 0 14px rgba(255, 246, 220, .7); }
-h2:has(.war) { margin-top: 34px; }
+/* The title: each part of the story is a bill pasted on the wall, the newest over the ones before it */
+#h2Line { display: grid; justify-items: center; align-items: center; min-height: 104px; margin: 22px 0 34px; font-size: 25px; letter-spacing: .04em; text-shadow: none; }
+.poster { grid-area: 1 / 1; margin: 0; display: none; filter: drop-shadow(0 3px 0 rgba(10, 8, 20, .5)) drop-shadow(0 0 14px rgba(10, 8, 20, .35)); }
+.poster span { display: block; padding: 9px 28px 11px; color: #2a1a12; white-space: nowrap;
+  background: linear-gradient(104deg, rgba(255, 255, 255, .32), rgba(255, 255, 255, 0) 28%, rgba(120, 86, 40, .14) 72%, rgba(255, 255, 255, .1)), repeating-linear-gradient(2deg, rgba(90, 60, 20, .06) 0 1px, rgba(0, 0, 0, 0) 1px 5px), #ead9b0;
+  clip-path: polygon(0 6%, 3% 0, 22% 3%, 41% 0, 63% 4%, 82% 0, 98% 3%, 100% 22%, 98% 55%, 100% 88%, 96% 100%, 74% 96%, 52% 100%, 30% 97%, 9% 100%, 0 92%, 2% 60%, 0 30%); }
+.poster.p1 { display: block; transform: translate(-46px, -20px) rotate(-1.4deg); }
+.poster.p2 span { background-color: #e4cf9c; clip-path: polygon(1% 0, 26% 4%, 50% 0, 77% 3%, 100% 0, 98% 34%, 100% 70%, 97% 100%, 70% 95%, 44% 100%, 18% 96%, 0 100%, 2% 58%, 0 24%); }
+.poster.p2.war { display: block; transform: translate(34px, 4px) rotate(2deg); }
+/* A bill never moves once it is pasted: the next one simply goes over it, and the old paper dulls a little */
+.poster.p3 span { padding: 14px 40px 16px; font-size: 38px; font-weight: 700; letter-spacing: .02em; color: #8a1410; background-color: #f3e7c6;
+  box-shadow: inset 0 0 0 7px #f3e7c6, inset 0 0 0 9px #2a1a12, inset 0 0 0 12px #f3e7c6, inset 0 0 0 13px #2a1a12;
+  clip-path: polygon(0 3%, 12% 0, 37% 2%, 61% 0, 88% 2%, 100% 0, 99% 36%, 100% 68%, 98% 100%, 76% 97%, 51% 100%, 27% 98%, 5% 100%, 0 94%, 1% 52%); }
+.poster.p3 small { display: block; font-size: 15px; font-weight: normal; letter-spacing: .34em; text-transform: uppercase; color: #2a1a12; margin-bottom: 2px; }
+#h2Line.free .p3 { display: block; transform: translate(-4px, 0) rotate(-2.2deg); }
+#h2Line:has(.p2.war) .poster.p1, #h2Line.free .poster.p1 { filter: brightness(.8) drop-shadow(0 3px 0 rgba(10, 8, 20, .5)); }
+#h2Line.free .poster.p2.war { filter: brightness(.85) drop-shadow(0 3px 0 rgba(10, 8, 20, .5)); }
+
+@media (max-width: 760px) { #h2Line { font-size: 17px; } .poster.p3 span { font-size: 21px; padding: 12px 22px 13px; white-space: normal; } .poster.p3 small { font-size: 11px; }
+  .poster.p1 { transform: translate(-14px, -16px) rotate(-1.4deg); } .poster.p2.war { transform: translate(12px, 3px) rotate(2deg); } }
+
+/* ---------- The revolution ---------- */
+/* The map of the south of Luzon and the field of each battle are drawn on the town's own canvas; what follows is the lettering laid over them. */
+body.war[data-phase=warMap] #scene { cursor: grab; }
+body.war #scene.grab { cursor: grabbing !important; }
+#warFade { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, #f4fbff, #cfe6f4); }
+body.war #resBar .res, body.war #marks, body.war #hint, body.war #buff, body.war #sgHp, body.war #sgFili, body.war #sgBar, body.war #btnL { display: none !important; }
+body.war:not([data-phase=battle]) #chipDay .track { visibility: hidden; }
+body.war[data-phase=battle] #chipDay .track { opacity: 1; }
+body.war[data-phase=battle] #hudStage { font-size: 44px; }
+body.war[data-phase=battle] #barStage { background: #ff6a4a; }
+/* Towns: the houses and the flag are on the map itself; here is the name, and where a click lands. */
+#warMarks { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; display: none; }
+body.war[data-phase=warMap] #warMarks { display: block; }
+.wtown, .wcol, .wname { position: absolute; left: 0; top: 0; padding: 0; border: 0; background: none; }
+.wtown, .wcol { pointer-events: auto; }
+.wtown { width: 0; height: 0; color: var(--cream); text-shadow: var(--edge); font-size: 16px; font-style: italic; white-space: nowrap; }
+.wtown i { position: absolute; left: -26px; top: -54px; width: 56px; height: 66px; border-radius: 12px; }
+.wtown b { position: absolute; left: 12px; top: 2px; font-weight: normal; pointer-events: none; }
+.wtown.boss b { font-size: 20px; left: 16px; }
+.wtown:hover { z-index: 3; }
+.wtown:hover b { color: #fff; }
+.wtown.locked { cursor: default; }
+.wtown.locked b { opacity: .8; }
+.wtown.open b { color: var(--sun); }
+.wtown.own b { color: #cfe4ff; }
+.wtown.gone { display: none; }
+#warMarks.far .wtown:not(.open):not(:hover):not(.home):not(.boss) b { display: none; }
+#warMarks.close .wtown b { font-size: 21px; }
+.wtown.lt b { left: auto; right: 12px; }
+.wtown.home b { color: var(--sun); }
+.wtown.manila b { font-size: 23px; }
+.wtown.manila i { left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; }
+/* The names of the country: seas in a pale hand, provinces spaced wide, and gold once they are free */
+.wname { width: 0; height: 0; white-space: nowrap; font-style: italic; font-size: 19px; color: rgba(236, 250, 255, .85); text-shadow: 0 1px 0 rgba(10, 40, 80, .55); display: flex; align-items: center; justify-content: center; }
+.wname.big { font-size: 24px; letter-spacing: .1em; }
+.wname.small { font-size: 15px; }
+.wname.land { font-style: normal; text-transform: uppercase; letter-spacing: .3em; font-size: 17px; color: rgba(255, 246, 220, .7); text-shadow: 0 1px 0 rgba(20, 40, 20, .6); }
+.wname.land.small { font-size: 12px; }
+.wname.prov { font-style: normal; text-transform: uppercase; letter-spacing: .26em; font-size: 21px; color: rgba(255, 238, 214, .92); text-shadow: var(--edge); }
+.wname.prov.free { color: var(--sun); }
+#warMarks.close .wname.prov { opacity: .35; }
+/* Columns and convoys on the roads */
+.wcol { left: -17px; top: -17px; width: 34px; height: 34px; border-radius: 50%; background: #ffd9cc; border: 2.5px solid #b0281a; box-shadow: 0 3px 0 rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; animation: bob .6s infinite alternate ease-in-out; z-index: 2; }
+.wcol .ic { width: 24px; height: 24px; }
+.wcol.conv { background: #fff3b0; border-color: #b8862b; }
+.wcol:hover { filter: brightness(1.12); }
+.wcol.far { animation: none; cursor: default; opacity: .55; filter: grayscale(.8); left: -12px; top: -12px; width: 24px; height: 24px; border-width: 2px; }
+.wcol.far .ic { width: 17px; height: 17px; }
+/* The bar under the map and under the field */
+#warBar { display: none; }
+body.war[data-phase=warMap] #warBar, body.war[data-phase=battle] #warBar { position: fixed; left: 0; right: 0; bottom: 14px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+#warHint { margin: 0; min-height: 22px; color: var(--cream); text-shadow: var(--edge); font-size: 17px; font-style: italic; }
+#warRow, #warRow2 { display: none; gap: 34px; align-items: flex-end; justify-content: center; flex-wrap: wrap; padding: 0 150px; }
+#warRow > *, #warRow2 > * { pointer-events: auto; }
+body[data-phase=warMap] #warRow, body[data-phase=battle] #warRow2 { display: flex; }
+#warBar .tbtn { font-size: 22px; }
+#warBar .tbtn.go { font-size: 26px; }
+#warBar .tbtn i { font-style: normal; font-size: 17px; color: var(--sun); font-variant-numeric: tabular-nums; }
+#warBar .tbtn i:empty { display: none; }
+#warBar .tbtn.post::after { opacity: 0; }
+#warBar .tbtn.post:hover::after, #warBar .tbtn.post.cur::after { opacity: 1; }
+#warBar .tbtn.post.cur { color: #fff; }
+#warBar .tbtn.post.cur::after { left: 0; right: 0; height: 3px; }
+#tree3 { display: none; padding: 0; background: rgba(12, 20, 44, .88); overflow: hidden; }
+#tree3.show { display: block; }
+#tree3World { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+#tree3Edges { position: absolute; left: 0; top: 0; overflow: visible; }
+#tree3Edges line { stroke: #c9a23a; stroke-width: 7; stroke-linecap: round; }
+#tree3Edges line.dim { stroke: #4a4f72; stroke-dasharray: 2 13; }
+#tree3Bar { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; }
+
+@media (max-width: 760px) { #warRow, #warRow2 { padding: 0 10px; gap: 14px; } }
+#warList { display: none; }
+body.war[data-phase=warMap] #warList { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; font-size: 19px; font-style: italic; }
+#warList div { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+#warList .ic { width: 22px; height: 22px; }
+#warList b { font-weight: normal; min-width: 96px; }
+#warList span { font-style: normal; font-variant-numeric: tabular-nums; color: var(--sun); }
+#warList .done b { color: #b8f08a; }
+#warList .shut { opacity: .6; }

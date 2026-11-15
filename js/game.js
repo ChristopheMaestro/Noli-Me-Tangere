@@ -10,7 +10,7 @@
   function fresh() {
     var up = {}, res = { pesos: 0 }; D.upgrades.forEach(function (u) { up[u.id] = 0; });
     D.resOrder.forEach(function (r) { res[r] = 0; });
-    return { day: 1, res: res, up: up, boss: 0, last: 0, time: 0, finished: false, auto: {}, sg: null }; // sg: the siege that follows the school (siege.js)
+    return { day: 1, res: res, up: up, boss: 0, last: 0, time: 0, finished: false, auto: {}, sg: null, war: null }; // sg: the siege that follows the school (siege.js); war: the revolution that follows the siege (war.js)
   }
   // Debug mode (in the options): its settings are kept apart from the saved game.
   var DBG_KEY = 'noli-debug', INF = 1e15, paused = false, hush = false;
@@ -638,6 +638,7 @@
   }
 
   function showTree() {
+    if (S.war) { R = null; Noli.War.enter(); return; } // the siege is won: what is left is the rest of the country
     if (S.finished) { hide('title'); hide('shop'); hide('tree'); R = null; Noli.Siege.enter(); return; } // the building is over: what is left is to defend it
     setPhase('tree');
     hide('dusk'); hide('title'); hide('shop');
@@ -711,6 +712,8 @@
   function put(el, text) { if (el._t !== text) { el._t = text; el.textContent = text; } }
   function wide(el, pct) { pct = pct.toFixed(1) + '%'; if (el._w !== pct) { el._w = pct; el.style.width = pct; } }
   function hud() {
+    if (S.war) { if (phase !== 'title') { Noli.War.hud(); return; } Noli.War.backdrop(); } // behind the title, the map of the revolution
+    else Noli.War.off();
     if (S.sg) { W.setSchool(D.stages.length - 1, 0); W.setHouses(S.sg.houses); Noli.Siege.hud(); return; }
     Noli.Siege.off();
     var b = bill(), sum = 0, n = 0, k;
@@ -740,16 +743,19 @@
 
   function hudTips() {
     tip($('chipDay'), function () {
+      if (S.war && phase !== 'title') return Noli.War.tipOf('day');
       if (S.sg) return Noli.Siege.tipOf('day');
       return tipHtml('Day ' + S.day, [[phase === 'day' ? 'The Angelus rings in ' + Math.ceil(dayLen() - R.t) + ' seconds and work stops.' : 'Night. A day lasts ' + baseLen() + ' seconds.']]);
     });
     tip($('chipStage'), function () {
+      if (S.war && phase !== 'title') return Noli.War.tipOf('stage');
       if (S.sg) return Noli.Siege.tipOf('stage');
       var s = stage();
       if (L('school') >= MAXSTEP) return tipHtml(D.stages[s].name, [[D.stages[s].note]]);
       return tipHtml(D.stages[s].name, [[D.stages[s].note], ['The next step needs:', 'k']].concat(billLines(bill())).concat([['Pay for it at night, at the centre of the tree.']]));
     });
     tip($('chipPesos'), function () {
+      if (S.war && phase !== 'title') return Noli.War.tipOf('pesos');
       if (S.sg) return Noli.Siege.tipOf('pesos');
       return tipHtml('Pesos', [['The town gives ' + fmt(pesoRate() * baseLen()) + ' pesos a day while the works go on, and more with every step of the school. Spend them at night on the tree of bonuses.']]);
     });
@@ -850,8 +856,9 @@
     var saved = load();
     S = saved || fresh();
     buildTree(); buildHud(); buildSpots(); hudTips();
-    Noli.Siege.init({ s: function () { return S; }, put: function (s) { S = s; R = null; }, fresh: fresh, save: save, phase: setPhase, now: function () { return phase; }, tip: tip, tipHtml: tipHtml, drawTip: drawTip, fmt: fmt, toast: toast,
-      floater: floater, tone: tone, mult: mult, dusk: duskScreen, hide: hide, crew: crew, put2: put, wide: wide, sfx: { buy: sfxBuy, no: sfxNo, hit: sfxHit, coin: sfxCoin, win: sfxWin, bell: sfxBell } });
+    var api = { s: function () { return S; }, put: function (s) { S = s; R = null; }, fresh: fresh, save: save, phase: setPhase, now: function () { return phase; }, tip: tip, tipHtml: tipHtml, drawTip: drawTip, fmt: fmt, toast: toast,
+      floater: floater, tone: tone, mult: mult, dusk: duskScreen, hide: hide, crew: crew, put2: put, wide: wide, sfx: { buy: sfxBuy, no: sfxNo, hit: sfxHit, coin: sfxCoin, win: sfxWin, bell: sfxBell }, ask: ask };
+    Noli.Siege.init(api); Noli.War.init(api);
 
     var menuCur = 'menuMain';
     function menu(id) {
@@ -870,12 +877,12 @@
     try { var d0 = JSON.parse(localStorage.getItem(DBG_KEY) || '{}'); for (var dk in dbg) if (typeof d0[dk] === typeof dbg[dk]) dbg[dk] = d0[dk]; } catch (e) { /* storage unavailable */ }
     function dbgKeep() { try { localStorage.setItem(DBG_KEY, JSON.stringify(dbg)); } catch (e) { /* storage unavailable */ } }
     function dbgDraw(keepBoss) {
-      var war = !!(S.finished || S.sg), list = war ? D.siege.bosses : D.bosses, sel = $('dbgBoss');
+      var war = S.war ? 'war' : S.finished || S.sg ? 'siege' : 'build', list = war === 'war' ? Noli.War.capitals() : war === 'siege' ? D.siege.bosses : D.bosses, sel = $('dbgBoss');
       $('optDebug').textContent = 'Debug mode: ' + (dbg.on ? 'on' : 'off'); $('dbg').classList.toggle('show', dbg.on);
       $('dbgAuto').checked = dbg.auto; $('dbgCps').value = dbg.cps; $('dbgCps').disabled = !dbg.auto; $('dbgCpsT').textContent = dbg.cps + ' a second';
       $('dbgMult').value = dbg.mult; $('dbgMult').disabled = dbg.inf; $('dbgMultT').textContent = '×' + dbg.mult; $('dbgInf').checked = dbg.inf;
       $('dbgSpree').checked = dbg.spree; $('dbgOrd').value = String(dbg.ord);
-      $('dbgStage').value = war ? 'siege' : 'build';
+      $('dbgStage').value = war;
       if (keepBoss === true && sel._war === war) return;
       sel._war = war;
       sel.innerHTML = '<option value="">Choose a boss</option>' + list.map(function (b, i) { return '<option value="' + i + '">' + (i + 1) + '. ' + b.name + '</option>'; }).join('');
@@ -884,8 +891,10 @@
     function jump(war, i) {
       marks.slice().forEach(function (m) { if (m.el.className.indexOf('spot') < 0) dropMark(m); });
       R = null; asking = null; ['dusk', 'tree', 'shop', 'ask'].forEach(hide);
-      if (war) { S.up.school = MAXSTEP; S.finished = true; S.boss = D.bosses.length; if (i < 0) S.sg = null; else Noli.Siege.jump(i); }
-      else { S.sg = null; S.finished = false; S.up.school = i < 0 ? 0 : i * D.STEPS + D.STEPS - 1; S.boss = Math.max(0, i); }
+      if (war === 'war') { // the revolution: the siege behind it is won
+        S.up.school = MAXSTEP; S.finished = true; S.boss = D.bosses.length; Noli.Siege.jump(D.siege.bosses.length - 1); S.sg.boss = D.siege.bosses.length; S.sg.won = true; Noli.War.jump(i);
+      } else if (war === 'siege') { S.war = null; Noli.War.off(); S.up.school = MAXSTEP; S.finished = true; S.boss = D.bosses.length; if (i < 0) S.sg = null; else Noli.Siege.jump(i); }
+      else { S.war = null; Noli.War.off(); S.sg = null; S.finished = false; S.up.school = i < 0 ? 0 : i * D.STEPS + D.STEPS - 1; S.boss = Math.max(0, i); }
       paused = false; document.body.classList.remove('paused'); setPhase('title'); $('title').classList.add('show');
       W.setDaylight(0); W.setSuspicion(0); crew(false);
       save(); saved = S; hasSave(); dbgDraw(true);
@@ -897,8 +906,8 @@
     $('dbgInf').onchange = function () { dbg.inf = this.checked; dbgKeep(); dbgDraw(true); };
     $('dbgSpree').onchange = function () { dbg.spree = this.checked; dbgKeep(); dbgDraw(true); if (dbg.on && dbg.spree && phase === 'tree') spree(); };
     $('dbgOrd').onchange = function () { dbg.ord = +this.value; dbgKeep(); dbgDraw(true); };
-    $('dbgStage').onchange = function () { jump(this.value === 'siege', -1); };
-    $('dbgBoss').onchange = function () { if (this.value !== '') jump($('dbgStage').value === 'siege', +this.value); };
+    $('dbgStage').onchange = function () { jump(this.value, -1); };
+    $('dbgBoss').onchange = function () { if (this.value !== '') jump($('dbgStage').value, +this.value); };
     function setMuted(m) {
       muted = m; $('btnMute').innerHTML = I(muted ? 'mute' : 'sound'); $('optSound').textContent = 'Sound: ' + (muted ? 'off' : 'on'); drawTip();
     }
@@ -906,7 +915,7 @@
     menu('menuMain'); hasSave();
     $('btnContinue').onclick = function () { ac(); if (paused) resume(); else showTree(); };
     $('btnPlay').onclick = function () {
-      var go = function () { ac(); S = fresh(); R = null; save(); startDay(); };
+      var go = function () { ac(); Noli.War.off(); S = fresh(); R = null; save(); startDay(); };
       if (saved) ask('A new game', 'This erases your saved school.', 'Start over', 'Keep it', go); else go();
     };
     $('askYes').onclick = function () { answer(true); };
@@ -920,7 +929,7 @@
         try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* storage unavailable */ }
         marks.slice().forEach(function (m) { if (m.el.className.indexOf('spot') < 0) dropMark(m); });
         ['dusk', 'tree', 'shop'].forEach(hide);
-        saved = null; S = fresh(); R = null; paused = false; document.body.classList.remove('paused'); setPhase('title'); W.setDaylight(0); W.setSuspicion(0); crew(false);
+        Noli.War.off(); saved = null; S = fresh(); R = null; paused = false; document.body.classList.remove('paused'); setPhase('title'); W.setDaylight(0); W.setSuspicion(0); crew(false);
         hasSave(); dbgDraw();
       });
     };
@@ -932,12 +941,12 @@
     $('btnMute').onclick = function () { setMuted(!muted); this.blur(); };
     $('btnL').onclick = function () { W.rotate(1); this.blur(); };
     $('btnSpeed').onclick = function () { speed = speed === 1 ? 2 : speed === 2 ? 5 : 1; this.textContent = '×' + speed; this.classList.toggle('fast', speed > 1); this.blur(); drawTip(); };
-    canvas.addEventListener('wheel', function (e) { W.zoom(e.deltaY); e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('wheel', function (e) { if (Noli.War.active()) return; W.zoom(e.deltaY); e.preventDefault(); }, { passive: false });
     // Drag the map to move it. W.dragged tells a click that ends a drag from a plain one.
     var drag = null;
     canvas.addEventListener('pointerdown', function (e) { if (e.button === 0) { drag = { x: e.clientX, y: e.clientY, far: 0 }; W.dragged = false; } });
     window.addEventListener('pointermove', function (e) {
-      if (!drag) return;
+      if (!drag || Noli.War.active()) return;
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.far += Math.abs(dx) + Math.abs(dy);
       if (drag.far > 6) { W.dragged = true; W.pan(dx, dy); canvas.classList.add('grab'); }
     });
@@ -954,11 +963,11 @@
         else if (paused) resume();
         else if (phase === 'title') return;
         else if (shopOpen) hide('shop');
-        else if (!Noli.Siege.esc()) pause();
+        else if (!Noli.Siege.esc() && !Noli.War.esc()) pause();
         return;
       }
       if (paused || /^(INPUT|SELECT)$/.test(e.target.tagName || '')) return;
-      if (ARROWS[e.code] && phase !== 'title' && phase !== 'tree' && phase !== 'siegeNight') { held[e.code] = true; e.preventDefault(); }
+      if (ARROWS[e.code] && phase !== 'title' && phase !== 'tree' && phase !== 'siegeNight' && !S.war) { held[e.code] = true; e.preventDefault(); }
       if (e.code === 'KeyQ') W.rotate(1);
       if (e.code === 'KeyE') W.rotate(-1);
       if (e.code === 'Enter' && phase === 'event') $('duskNext').click();
@@ -975,6 +984,7 @@
     // boss=1 makes it a confrontation, up=2 sets every bonus to level 2, rich=1 fills the stores. bot=4 plays the whole game at 4 clicks a second.
     var q = new URLSearchParams(location.search);
     if (q.get('sbot')) { W.update(0.016); Noli.Siege.bot(+q.get('sbot')); }
+    if (q.get('wbot')) { W.update(0.016); Noli.War.bot(+q.get('wbot')); }
     if (q.get('bot')) { W.update(0.016); q.get('bot').split(',').forEach(function (c) { runBot(+c); }); }
     if (q.get('auto')) {
       S = fresh();
@@ -985,6 +995,7 @@
       S.last = 200;
       W.update(0.016);
       if (q.get('auto') === 'siege') Noli.Siege.debug(q); // siege.js lists what it takes
+      else if (q.get('auto') === 'war') Noli.War.debug(q); // and war.js
       else if (q.get('auto') === 'tree') showTree();
       else if (q.get('auto') === 'shop') { showTree(); showShop(); }
       else if (q.get('auto') === 'ask') { showTree(); D.resOrder.concat(['pesos']).forEach(function (k) { S.res[k] = 1e9; }); S.boss = D.bosses.length; updateTree(); buy(byId.school); }
@@ -1011,30 +1022,35 @@
     var perf = q.get('perf') ? document.createElement('div') : null;
     if (perf) { perf.id = 'perf'; document.body.appendChild(perf); }
 
-    var last = performance.now(), tipClock = 0;
+    var last = performance.now(), tipClock = 0, jsAcc = 0, jsN = 0;
     function frame(now) {
-      var dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
+      var dt = Math.max(0, Math.min(0.1, (now - last) / 1000)), t0 = perf ? performance.now() : 0; last = now;
       for (var n = 0; n < speed; n++) { // the speed button: time is run two or five times over, in the same small steps
         if (paused || lockT) break;
         if (phase === 'day') { if (dbg.on && dbg.auto) autoClick(dt); tickDay(dt); }
         else if (phase === 'siege') Noli.Siege.tick(dt);
+        else if (phase === 'battle' || phase === 'warMap') Noli.War.tick(dt);
       }
       pin();
       var war = !!(S.finished || S.sg) || titleWar, word = $('h2Word'); if (word._w !== war) { word._w = war; word.classList.toggle('war', war); } // the title, once the school is built
-      panKeys(dt); hud(); W.update(dt, phase === 'tree' || phase === 'siegeNight' || paused);
-      tipClock += dt;
+      var free = !!S.war || titleFree, line = $('h2Line'); if (line._f !== free) { line._f = free; line.classList.toggle('free', free); } // and once the siege is won
+      panKeys(dt); hud();
+      Noli.War.draw(dt); W.update(dt, phase === 'tree' || phase === 'siegeNight' || phase === 'warTree' || (phase === 'title' && !!S.war) || paused); // (the map and the fields of the revolution are drawn by the same call: see W.show)
+      tipClock += dt; if (perf) { jsAcc += performance.now() - t0; jsN++; }
       if (tipClock > 0.25) {
         tipClock = 0; if (tipCur) drawTip(); if (phase === 'day') showSpots();
-        if (perf) perf.textContent = W.stats.ms.toFixed(1) + ' ms a frame · ' + W.stats.calls + ' draw calls · ' + Math.round(W.stats.tris / 1000) + 'k triangles · quality ' + W.stats.quality + ' (×' + W.stats.scale.toFixed(2) + ')';
+        if (perf) perf.textContent = W.stats.ms.toFixed(1) + ' ms a frame (' + (jsAcc / Math.max(1, jsN)).toFixed(1) + ' of them in the script) · ' + W.stats.calls + ' draw calls · ' + Math.round(W.stats.tris / 1000) + 'k triangles · quality ' + W.stats.quality + ' (×' + W.stats.scale.toFixed(2) + ')'; jsAcc = jsN = 0;
       }
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
   }
   var lockT = false; // debug: freeze the day for screenshots
-  var titleWar = /[?&]title=war/.test(location.search); // debug: the title as it reads once the school is built
+  var titleFree = /[?&]title=free/.test(location.search), titleWar = titleFree || /[?&]title=war/.test(location.search); // debug: the title as it reads once the school is built, and once the siege is won
   var speed = 1, panKeys = function () {}; // speed: 1, 2 or 5 times, from the button beside the view
 
   window.addEventListener('error', function (e) { var b = $('err'); if (b) { b.style.display = 'block'; b.textContent = 'Error: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'; } });
-  window.addEventListener('DOMContentLoaded', boot);
+  // The page is shown once before the town is built, so that the logo and the word 'Loading' are on the screen while it is.
+  var booted = false, boot1 = function () { if (!booted) { booted = true; boot(); } };
+  window.addEventListener('DOMContentLoaded', function () { requestAnimationFrame(function () { setTimeout(boot1, 0); }); setTimeout(boot1, 400); }); // (a tab in the background draws no frame: the clock starts it there)
 })();

@@ -262,7 +262,7 @@
   var QUARRY = [14.6, -11.4], CLAY = [3.1, 14.8], BRICKKILN = [-1.4, 13.3], LIMEKILN = [-10.5, 23.2];
   function rel(o, list) { return list.map(function (p) { return [o[0] + p[0], o[1] + p[1], p[2]]; }); }
 
-  function mountain(x, z, r, h) {
+  function mountain(x, z, r, h, parent) {
     var g = new T.ConeGeometry(r, h, 11, 5), pos = g.attributes.position, col = new Float32Array(pos.count * 3), c = new T.Color();
     var lo = new T.Color(0x2c8a48), mid = new T.Color(0x4f9a78), hi = new T.Color(0x8f9ad0), top = new T.Color(0xd8dcf6);
     for (var i = 0; i < pos.count; i++) {
@@ -276,7 +276,7 @@
     }
     g.setAttribute('color', new T.BufferAttribute(col, 3));
     var m = new T.Mesh(g, mats.mtn || (mats.mtn = new T.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 })));
-    add(scene, m, x, h / 2 - 0.2, z);
+    add(parent || scene, m, x, h / 2 - 0.2, z);
   }
 
   function buildTerrain() {
@@ -877,13 +877,13 @@
     rt.texture.encoding = T.sRGBEncoding;
     rt.depthTexture = new T.DepthTexture(4, 4, T.UnsignedIntType); // the default 16-bit depth z-fights on the ground layers
     var m = new T.ShaderMaterial({
-      uniforms: { tD: { value: rt.texture }, res: { value: new T.Vector2(4, 4) }, war: { value: 0 } },
+      uniforms: { tD: { value: rt.texture }, res: { value: new T.Vector2(4, 4) }, war: { value: 0 }, soft: { value: 1 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: [
-        'uniform sampler2D tD; uniform vec2 res; uniform float war; varying vec2 vUv;',
+        'uniform sampler2D tD; uniform vec2 res; uniform float war; uniform float soft; varying vec2 vUv;',
         'void main(){',
         '  vec2 px = 1.0 / res;',
-        '  float blur = smoothstep(0.17, 0.5, abs(vUv.y - 0.5)) * res.y * 0.0045;',
+        '  float blur = smoothstep(0.17, 0.5, abs(vUv.y - 0.5)) * res.y * 0.0045 * soft;',
         '  vec3 col = vec3(0.0); vec3 glow = vec3(0.0);',
         '  if (blur < 0.5) col = texture2D(tD, vUv).rgb;', // the middle band is sharp: one read is the same as ten identical ones
         '  for (int i = 0; i < 10; i++) {',
@@ -942,15 +942,31 @@
     var ms = quality >= 2 ? 1024 : 2048;
     if (sun.shadow.mapSize.x !== ms) { sun.shadow.mapSize.set(ms, ms); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } shadowDirty = true; }
     stats.scale = k; stats.quality = quality;
-    var a = w / h, v = VIEW / zoom / 2;
-    if (a < 1.3) v *= 1.3 / a; // keep the town in view on narrow screens
-    camera.left = -v * a; camera.right = v * a; camera.top = v; camera.bottom = -v;
-    camera.updateProjectionMatrix();
+    proj();
     if (post) {
       var rw = Math.max(4, Math.floor(w * k)), rh = Math.max(4, Math.floor(h * k));
       rt.setSize(rw, rh); post.mat.uniforms.res.value.set(rw, rh);
     }
   }
+  var lift = 1; // the eye drawn back from the town, as the revolution leaves it
+  function proj() {
+    var a = window.innerWidth / window.innerHeight, v = VIEW / zoom / 2 * lift;
+    if (a < 1.3) v *= 1.3 / a; // keep the town in view on narrow screens
+    camera.left = -v * a; camera.right = v * a; camera.top = v; camera.bottom = -v; camera.far = 220 * lift;
+    camera.updateProjectionMatrix();
+  }
+  W.setLift = function (k) { if (k !== lift) { lift = k; proj(); } };
+
+  // Another scene on the same stage: the map of the revolution and its battlefields (warview.js) are drawn by the same hand, through
+  // the same lens, as the town. s: { scene, camera, update(dt, clock), red, soft, shadow }, or nothing to go back to the town.
+  var stage = null;
+  W.show = function (s) { stage = s || null; shadowDirty = true; if (s) s.shadow = true; };
+  W.showing = function () { return stage; };
+  W.kit = function () {
+    return { T: T, PX: PX, mat: mat, tmat: tmat, box: box, tbox: tbox, cyl: cyl, roof: roof, quad: quad, beam: beam, cross: cross, treeGeo: treeGeo, kubo: kubo, mountain: mountain, weldInto: weldInto,
+      sacks: sacks, barricade: barricade, stakes: stakes, cart: cart, gun: gun, tent: tent, crates: crates, win: winMat, glow: glowMat,
+      treeMat: treeMat || (treeMat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })) };
+  };
 
   W.rotate = function (dir) { yawTarget += dir * Math.PI / 2; };
   W.zoom = function (delta) { zoom = Math.max(0.75, Math.min(2.4, zoom * (delta > 0 ? 0.9 : 1.1))); resize(); W.pan(0, 0); };
@@ -1008,7 +1024,8 @@
     sun.target.position.copy(TARGET);
     // Sprites are unlit, so tint them with the light of the hour.
     tint.setRGB(Math.min(1, tmpC.r * inten * 0.6 + hemi.color.r * hI * 0.85), Math.min(1, tmpC.g * inten * 0.6 + hemi.color.g * hI * 0.85), Math.min(1, tmpC.b * inten * 0.6 + hemi.color.b * hI * 0.85));
-    for (var i = 0; i < unlit.length; i++) unlit[i].color.copy(tint);
+    var th = tint.getHex() + ':' + unlit.length; // (only when the hour has changed its colour, or a new sprite has come)
+    if (th !== tintKey) { tintKey = th; for (var i = 0; i < unlit.length; i++) unlit[i].color.copy(tint); }
     // Lamps and capiz windows light up as evening falls.
     nightK = Math.max(0, Math.min(1, (f - 0.82) / 0.4));
     winMat.emissive.copy(warm).multiplyScalar(nightK * 0.95);
@@ -1032,7 +1049,7 @@
   // (the screen is simply capped, or the slowness is elsewhere) it steps back and stops trying.
   var QUALITY = [1, 0.8, 0.64, 0.5], quality = 0, qLock = false, fAcc = 0, fN = 0, fSkip = 3, fBefore = 0, idleAcc = 0;
   var stats = { calls: 0, tris: 0, scale: 1, quality: 0, ms: 0 };
-  var shadowDirty = true, shadowAcc = 0, shadowF = -1, schoolSig = '';
+  var shadowDirty = true, shadowAcc = 0, shadowF = -1, schoolSig = '', tintKey = '';
   W.stats = stats;
   function watch(dt) {
     if (dt <= 0 || dt >= 0.1) return;
@@ -1044,14 +1061,28 @@
     if (avg > 1 / 42 && quality < QUALITY.length - 1) { fBefore = avg; quality++; fSkip = 1; resize(); }
   }
 
-  // idle: the world is only a backdrop (the tree is open), so it is drawn at a third of the pace.
+  // idle: the world is only a backdrop (a tree, the menu or the title lies over it), so it is drawn twenty times a second and no more.
   W.update = function (dt, idle) {
+    if (stage) {
+      if (idle) { idleAcc += dt; if (idleAcc < 0.05) return; dt = Math.min(0.1, idleAcc); idleAcc = 0; } else watch(dt);
+      clock += dt; stage.update(dt, clock);
+      if (stage.shadow) { renderer.shadowMap.needsUpdate = true; stage.shadow = false; }
+      renderer.info.reset();
+      if (post) {
+        var pu = post.mat.uniforms, w0 = pu.war.value; pu.war.value = stage.red || 0; pu.soft.value = stage.soft == null ? 1 : stage.soft;
+        renderer.setRenderTarget(rt); renderer.render(stage.scene, stage.camera);
+        renderer.setRenderTarget(null); renderer.render(post.scene, post.cam);
+        pu.war.value = w0; pu.soft.value = 1;
+      } else renderer.render(stage.scene, stage.camera);
+      stats.calls = renderer.info.render.calls; stats.tris = renderer.info.render.triangles;
+      return;
+    }
     if (idle) { idleAcc += dt; if (idleAcc < 0.05) return; dt = Math.min(0.1, idleAcc); idleAcc = 0; } else watch(dt);
     clock += dt;
     yaw += (yawTarget - yaw) * Math.min(1, dt * 7);
     dayF += (dayTarget - dayF) * Math.min(1, dt * (Math.abs(dayTarget - dayF) > 0.4 ? 2.5 : 12));
     applyLight();
-    var el = topView ? 1.25 : Math.atan(Math.SQRT1_2), R = 90, i;
+    var el = topView ? 1.25 : Math.atan(Math.SQRT1_2), R = 90 * lift, i;
     if (topView) yaw = Math.PI / 2;
     camera.position.set(TARGET.x + Math.cos(yaw) * Math.cos(el) * R, Math.sin(el) * R, TARGET.z + Math.sin(yaw) * Math.cos(el) * R);
     camera.lookAt(TARGET);
@@ -1104,7 +1135,7 @@
     siegeFx(dt);
 
     shadowAcc += dt;
-    if (pulse > 0 || shadowDirty || shadowAcc > 0.5 || Math.abs(dayF - shadowF) > 0.0005) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; shadowAcc = 0; shadowF = dayF; }
+    if (pulse > 0 || shadowDirty || shadowAcc > 0.5 || Math.abs(dayF - shadowF) > 0.006) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; shadowAcc = 0; shadowF = dayF; }
     renderer.info.reset();
     if (post) {
       renderer.setRenderTarget(rt); renderer.render(scene, camera);

@@ -272,6 +272,7 @@ window.Noli = window.Noli || {};
   // ---------- The siege: what comes after the school is finished ----------
   // The workers take up arms as filibusteros, the materials are gone, and the game becomes a defence of the school.
   var plus = function (v) { return '+' + Math.round((v - 1) * 100) + '%'; };
+  var less = function (what) { return function (v) { return Math.round((1 - v) * 100) + '% ' + what; }; };
   Noli.Data.siege = {
     HP: 20,            // what the school can take in a day before it is overrun
     MIN_F: 20,         // filibusteros you have at the least, however few workers were hired
@@ -391,5 +392,224 @@ window.Noli = window.Noli || {};
 
     intro: 'The town is with you. The convento is not. The friars have told Manila that the school is a nest of filibusteros, and the Guardia Civil is on the road with every bully the curate could hire. Your workers have put down their tools and picked up what they could find. The materials are spent, the money is gone: all you have is them.',
     victory: 'Padre Dámaso is carried back to the convento on a door. The Captain-General, who never liked the friars, lets it be known that the school of San Diego is under his protection. They may come again; but the children are at their desks, and the men on the lookouts are not going home yet.'
+  };
+
+  // ---------- The revolution: what comes after the siege is won ----------
+  // The filibusteros become freedom fighters and march out of San Diego. The map is the south of Luzon as it was before 1898
+  // (towns, provinces and spellings of the time), and the towns are taken one battle at a time: twenty in five provinces, then Manila.
+  Noli.Data.war = {
+    MEN: [80, 300],     // the fewest and the most men the siege can hand over
+    T: 90,              // seconds a battle may last before the men fall back
+    UNIT: 10, MAX_UNITS: 90, // men to a figure on the field, and the most figures a side may have (past that each figure stands for more men)
+    HP: 40,             // what one man can take
+    AGGRO: 16,          // bolo men go for any enemy this near
+    E0: 150, E_GROW: 1.18, // the garrison of the first town, and how much bigger each next one is
+    Q_HP: 1.115, Q_DMG: 1.085, // each town on, every enemy takes and does this much more
+    BOUNTY: 1, BOUNTY_GROW: 1.05, PURSE: 0.5, // salapi for each enemy brought down in the first town, its growth, and the town's own chest as a share of the garrison's worth
+    JOIN: 30, JOIN_GROW: 1.14, JOIN_BOSS: 2.5, // men who join in the first town you free, how many more in each town after it, and how many times over in a capital
+    COLS: [0.22, 0.36, 0.55], // the columns on the roads, as a share of the weakest garrison you could attack
+    COL_SPEED: 2.8,     // how fast a column goes along its road, in cells of the map a second
+    PRICE: 3.5,          // every price in the tree, times this
+    HORN_CD: 45,
+    CONVOY_EVERY: 70, CONVOY_SIZE: 0.4, CONVOY_MEN: 0.35, // seconds between prisoner convoys, their escort, and the prisoners as a share of what the next town would give
+    CHARGE_CD: 24, VOLLEY_CD: 16,
+
+    // Who fights. All numbers are for one man: hp (times HP), dps, shots or blows a second, reach and speed in field units.
+    kinds: {
+      bolo: { name: 'Bolo men', melee: true, hp: 1, dps: 1.7, rate: 1.1, range: 2, speed: 10, look: { hat: 'salakot', top: 0xf4ecd8, bottom: 0xb8323a, sash: 0xd8222a, tool: 0xd4d8e4 } },
+      rifle: { name: 'Riflemen', hp: 0.8, dps: 1, rate: 0.45, range: 21, speed: 7.5, look: { hat: 'salakot', top: 0x9ab0cc, bottom: 0xf0e8d8, sash: 0xd8222a } },
+      lantaka: { name: 'Lantakas', hp: 1.2, dps: 1.2, rate: 0.22, range: 36, splash: 5, speed: 4.5, gun: true, look: { top: 0xf4ecd8, bottom: 0x6a4a34, sash: 0xd8222a } },
+      guardia: { name: 'Guardia Civil', hp: 1, dps: 0.9, rate: 0.4, range: 19, speed: 6.5, w: 5, from: 1, look: { hat: 'cap', top: 0x2a4a9a, bottom: 0xf0e8d8, shoe: 0x1a1420, sash: 0xfff6ea } },
+      cuadrillero: { name: 'Cuadrilleros', melee: true, hp: 0.8, dps: 1.4, rate: 1.1, range: 2, speed: 11, w: 3, from: 1, look: { top: 0xb8a070, bottom: 0x4a4a6a, hair: 0x2a1c16, sash: 0xd8222a, tool: 0xc8ccd8 } },
+      cazador: { name: 'Cazadores', hp: 1.7, dps: 1.4, rate: 0.5, range: 23, speed: 6, w: 2, from: 7, look: { hat: 'cap', top: 0xf0e8d8, bottom: 0xd8222a, shoe: 0x1a1420, sash: 0x2a4a9a, big: 1.12 } },
+      carabinero: { name: 'Carabineros', melee: true, hp: 1.8, dps: 1.6, rate: 1, range: 2.2, speed: 9, w: 1.5, from: 13, look: { hat: 'cap', top: 0x3a6a4a, bottom: 0x2a2634, shoe: 0x1a1420, sash: 0xf7c930, tool: 0xe8e8f0 } },
+      canon: { name: 'Artillery', hp: 3, dps: 1.6, rate: 0.2, range: 40, splash: 5, speed: 0, gun: true, look: { hat: 'cap', top: 0x2a2634, bottom: 0xd8222a, shoe: 0x1a1420, sash: 0xf7c930 } },
+      jefe: { name: 'The commander', hp: 5, dps: 2.4, rate: 0.8, range: 12, speed: 5, look: { hat: 'cap', top: 0xf0e8d8, bottom: 0x2a4a9a, shoe: 0x1a1420, sash: 0xf7c930, big: 1.8 } }
+    },
+
+    // The provinces, in the order their names are lettered on the map. at: where the name is written (latitude, longitude).
+    provinces: {
+      laguna: { name: 'La Laguna', at: [14.105, 121.42], jefe: 'the Governor of La Laguna' },
+      cavite: { name: 'Cavite', at: [14.29, 120.82], jefe: 'the Commandant of the Arsenal' },
+      batangas: { name: 'Batangas', at: [13.80, 121.24], jefe: 'the Governor of Batangas' },
+      morong: { name: 'Morong', at: [14.64, 121.30], jefe: 'the Commandant of Morong' },
+      bulacan: { name: 'Bulacán', at: [14.92, 120.98], jefe: 'the Alcalde Mayor of Bulacán' },
+      manila: { name: 'Manila', at: [14.60, 120.99], jefe: 'the Captain-General' }
+    },
+    HOME: { id: 'sandiego', name: 'San Diego', at: [14.212, 121.165] },
+    MANILA: [14.592, 120.990, 5.2], // the middle of the wall round Manila and its arrabales, and how far out it stands, in kilometres
+    // The twenty-five towns, weakest garrison first. at: latitude and longitude; boss: a capital, held by the province's commander.
+    towns: [
+      { id: 'binan', name: 'Biñan', prov: 'laguna', at: [14.340, 121.080] },
+      { id: 'sanpablo', name: 'San Pablo', prov: 'laguna', at: [14.070, 121.325] },
+      { id: 'pagsanjan', name: 'Pagsanján', prov: 'laguna', at: [14.273, 121.455] },
+      { id: 'santacruz', left: true, name: 'Santa Cruz', prov: 'laguna', at: [14.282, 121.413], boss: true },
+      { id: 'silang', left: true, name: 'Silang', prov: 'cavite', at: [14.225, 120.975] },
+      { id: 'imus', name: 'Imus', prov: 'cavite', at: [14.430, 120.937] },
+      { id: 'malabon', left: true, name: 'San Francisco de Malabón', prov: 'cavite', at: [14.387, 120.880] },
+      { id: 'cavite', name: 'Cavite', prov: 'cavite', at: [14.484, 120.893], boss: true },
+      { id: 'tanauan', name: 'Tanauan', prov: 'batangas', at: [14.086, 121.150] },
+      { id: 'lipa', name: 'Lipa', prov: 'batangas', at: [13.941, 121.163] },
+      { id: 'taal', name: 'Taal', prov: 'batangas', at: [13.868, 120.925] },
+      { id: 'batangas', name: 'Batangas', prov: 'batangas', at: [13.757, 121.058], boss: true },
+      { id: 'tanay', name: 'Tanay', prov: 'morong', at: [14.497, 121.285] },
+      { id: 'antipolo', name: 'Antipolo', prov: 'morong', at: [14.587, 121.176] },
+      { id: 'binangonan', left: true, name: 'Binangonan', prov: 'morong', at: [14.465, 121.192] },
+      { id: 'morong', name: 'Morong', prov: 'morong', at: [14.512, 121.238], boss: true },
+      { id: 'sanjose', name: 'San José del Monte', prov: 'bulacan', at: [14.814, 121.045] },
+      { id: 'meycauayan', left: true, name: 'Meycauayan', prov: 'bulacan', at: [14.737, 120.961] },
+      { id: 'malolos', left: true, name: 'Malolos', prov: 'bulacan', at: [14.843, 120.811] },
+      { id: 'bulacan', name: 'Bulacán', prov: 'bulacan', at: [14.795, 120.879], boss: true },
+      { id: 'tondo', left: true, name: 'Tondo', prov: 'manila', at: [14.619, 120.968] },
+      { id: 'sampaloc', name: 'Sampaloc', prov: 'manila', at: [14.608, 121.000] },
+      { id: 'santaana', name: 'Santa Ana', prov: 'manila', at: [14.580, 121.013] },
+      { id: 'malate', left: true, name: 'Malate', prov: 'manila', at: [14.566, 120.988] },
+      { id: 'intramuros', left: true, name: 'Intramuros', prov: 'manila', at: [14.590, 120.974], boss: true }
+    ],
+    // The roads between them (and one crossing of the lake). A town can be attacked once a town at the other end of one of its roads is yours.
+    // via: the places a road passes through, so that it follows the country and not a ruler.
+    links: [
+      { a: 'sandiego', b: 'binan', via: [[14.277, 121.123], [14.312, 121.111]] },
+      { a: 'sandiego', b: 'sanpablo', via: [[14.190, 121.170], [14.166, 121.228], [14.160, 121.285], [14.148, 121.315]] },
+      { a: 'sandiego', b: 'santacruz', via: [[14.190, 121.170], [14.166, 121.228], [14.160, 121.285], [14.232, 121.365]] },
+      { a: 'sanpablo', b: 'pagsanjan', via: [[14.136, 121.416], [14.200, 121.430]] },
+      { a: 'pagsanjan', b: 'santacruz' },
+      { a: 'sandiego', b: 'silang', via: [[14.200, 121.060]] },
+      { a: 'binan', b: 'silang', via: [[14.313, 121.057]] },
+      { a: 'silang', b: 'imus', via: [[14.327, 120.937]] },
+      { a: 'imus', b: 'malabon' },
+      { a: 'imus', b: 'cavite', via: [[14.440, 120.900], [14.450, 120.882], [14.464, 120.884], [14.474, 120.889]] },
+      { a: 'malabon', b: 'cavite', via: [[14.430, 120.878], [14.450, 120.881], [14.464, 120.884], [14.474, 120.889]] },
+      { a: 'sandiego', b: 'tanauan', via: [[14.108, 121.142]] },
+      { a: 'tanauan', b: 'lipa' },
+      { a: 'sanpablo', b: 'lipa', via: [[14.020, 121.250]] },
+      { a: 'lipa', b: 'batangas', via: [[13.877, 121.105]] },
+      { a: 'lipa', b: 'taal', via: [[13.900, 121.060], [13.848, 120.995]] },
+      { a: 'taal', b: 'batangas', via: [[13.800, 121.000]] },
+      { a: 'santacruz', b: 'tanay', via: [[14.297, 121.462], [14.365, 121.487], [14.405, 121.472], [14.428, 121.447], [14.452, 121.400], [14.470, 121.345], [14.492, 121.312]] },
+      { a: 'binangonan', b: 'morong', via: [[14.488, 121.226]] },
+      { a: 'tanay', b: 'morong', via: [[14.512, 121.270]] },
+      { a: 'tanay', b: 'antipolo', via: [[14.540, 121.262], [14.566, 121.222]] },
+      { a: 'binangonan', b: 'antipolo', via: [[14.490, 121.190], [14.515, 121.170], [14.548, 121.152]] },
+      { a: 'morong', b: 'antipolo', via: [[14.560, 121.212]] },
+      { a: 'antipolo', b: 'sanjose', via: [[14.697, 121.120], [14.750, 121.065]] },
+      { a: 'sanjose', b: 'meycauayan' },
+      { a: 'meycauayan', b: 'bulacan', via: [[14.798, 120.926]] },
+      { a: 'meycauayan', b: 'malolos', via: [[14.798, 120.926], [14.832, 120.878]] },
+      { a: 'malolos', b: 'bulacan' },
+      { a: 'meycauayan', b: 'tondo', via: [[14.652, 120.972]] },
+      { a: 'antipolo', b: 'sampaloc', via: [[14.632, 121.095]] },
+      { a: 'antipolo', b: 'santaana', via: [[14.578, 121.120], [14.562, 121.078]] },
+      { a: 'binan', b: 'malate', via: [[14.390, 121.045], [14.480, 121.020]] },
+      { a: 'imus', b: 'malate', via: [[14.459, 120.940], [14.450, 120.982], [14.500, 120.993]] },
+      { a: 'tondo', b: 'intramuros' }, { a: 'sampaloc', b: 'intramuros' }, { a: 'santaana', b: 'intramuros' }, { a: 'malate', b: 'intramuros' }
+    ],
+
+    branches: { men: 'Cold steel', arms: 'Firearms', post: 'The guns', town: 'The camp', chest: 'The war chest', friend: 'Friends', kkk: 'The Katipunan' },
+    // The tree of the revolution, paid in salapi. Money buys better arms, never more men: men come from the towns you free.
+    // It is meant to outlast the war: nobody reaches Manila with all of it, and Intramuros can fall with a good part still unbought.
+    upgrades: [
+      { id: 'bandera', icon: 'flagPh', branch: 'town', x: 0, y: 0, req: {}, max: 20, cost: 30, growth: 1.5,
+        name: 'The Flag', desc: 'Sewn by the women of San Diego: a sun, three stars, and something worth dying under. Everyone hits harder.',
+        val: function (l) { return 1 + 0.05 * l; }, show: plus },
+
+      { id: 'itak', icon: 'bolo', branch: 'men', x: -1, y: 0, req: { bandera: 0 }, max: 20, cost: 20, growth: 1.45,
+        name: 'Whetted Bolos', desc: 'Every cane knife in the province, ground to an edge. The bolo men hit harder.',
+        val: function (l) { return 1 + 0.1 * l; }, show: plus },
+      { id: 'anting', icon: 'shield', branch: 'men', x: -2, y: 0, req: { itak: 2 }, max: 20, cost: 35, growth: 1.45,
+        name: 'Anting-anting', desc: 'Amulets sewn into the shirt, said to turn a bullet. Whether or not they do, every man stands longer.',
+        val: function (l) { return 1 + 0.08 * l; }, show: plus },
+      { id: 'sandugo', icon: 'drop', branch: 'kkk', x: -3, y: 0, req: { anting: 3 }, max: 10, cost: 120, growth: 1.6,
+        name: 'The Blood Compact', desc: 'Each new brother opens his arm and signs the oath of the Katipunan in his own blood. A man who has done that does not tire: the bolo men strike faster.',
+        val: function (l) { return 1 + 0.05 * l; }, show: plus },
+      { id: 'arnis', icon: 'hand', branch: 'men', x: -4, y: 0, req: { sandugo: 2 }, max: 10, cost: 200, growth: 1.65,
+        name: 'Arnis', desc: 'The old stick fighting the friars forbade, kept alive in the moro-moro plays. The bolo men turn aside part of every blow and bayonet.',
+        val: function (l) { return 1 - 0.04 * l; }, show: less('less harm to the bolo men, hand to hand') },
+      { id: 'sugod', icon: 'rush', branch: 'men', x: -2, y: -1, req: { itak: 3 }, max: 6, cost: 150, growth: 2,
+        name: 'Sugod!', desc: 'The charge. On your word the bolo men run half as fast again and strike half as hard again.',
+        val: function (l) { return l ? 4 + l : 0; }, show: function (v) { return 'for ' + v + ' seconds'; } },
+      { id: 'gomburza', icon: 'cross', branch: 'kkk', x: -3, y: -1, req: { sugod: 1 }, max: 10, cost: 300, growth: 1.7,
+        name: 'Gomburza', desc: 'Gómez, Burgos, Zamora: three priests garrotted on Bagumbayan field in 1872, and the password of the highest grade. Said in the ranks, it sends every blow at the man in command.',
+        val: function (l) { return 1 + 0.15 * l; }, show: function (v) { return '+' + Math.round((v - 1) * 100) + '% against commanders'; } },
+
+      { id: 'fusil', icon: 'rifle', branch: 'arms', x: 0, y: -1, req: { bandera: 0 }, max: 15, cost: 40, growth: 1.5,
+        name: 'Captured Remingtons', desc: 'Taken from the dead and from the armouries. More of your men carry a rifle instead of a bolo.',
+        val: function (l) { return 0.25 + 0.03 * l; }, show: function (v) { return Math.round(v * 100) + '% of the men are riflemen'; } },
+      { id: 'paltik', icon: 'hammer', branch: 'arms', x: 1, y: -1, req: { fusil: 2 }, max: 8, cost: 110, growth: 1.7,
+        name: 'Paltik', desc: 'Guns made at the village forge out of water pipe and church railings, bored a little longer each month. Your riflemen reach further.',
+        val: function (l) { return 0.8 * l; }, show: function (v) { return '+' + v.toFixed(1) + ' reach'; } },
+      { id: 'punteria', icon: 'eye', branch: 'arms', x: -1, y: -2, req: { fusil: 1 }, max: 20, cost: 30, growth: 1.45,
+        name: 'Marksmanship', desc: 'Old hunters teach the rest to hold their breath. Every rifle shot does more.',
+        val: function (l) { return 1 + 0.1 * l; }, show: plus },
+      { id: 'polvora', icon: 'spark', branch: 'arms', x: 0, y: -2, req: { fusil: 2 }, max: 15, cost: 60, growth: 1.5,
+        name: 'Cartridges', desc: 'Refilled at night by the women and the boys, by the thousand. Riflemen and guns fire faster.',
+        val: function (l) { return 1 + 0.05 * l; }, show: plus },
+      { id: 'descarga', icon: 'flame', branch: 'arms', x: 1, y: -2, req: { fusil: 3 }, max: 6, cost: 180, growth: 2,
+        name: 'The Volley', desc: 'On your word every rifleman fires at once, and it counts for several shots.',
+        val: function (l) { return l ? 2 + 0.5 * l : 0; }, show: function (v) { return 'worth ' + v + ' shots each'; } },
+      { id: 'maestranza', icon: 'kiln', branch: 'arms', x: 2, y: -2, req: { polvora: 3 }, max: 12, cost: 160, growth: 1.6,
+        name: 'The Maestranza', desc: 'The workmen of the Manila arsenal are brothers too, and what they carry out under their shirts is not their lunch. Your riflemen are better equipped and stand longer.',
+        val: function (l) { return 1 + 0.1 * l; }, show: plus },
+
+      { id: 'lantaka', icon: 'cannon', branch: 'post', x: 1, y: 0, req: { bandera: 1 }, max: 10, cost: 120, growth: 1.75,
+        name: 'Lantakas', desc: 'The bronze guns of the siege, on carts. Each level brings one more to the field; their shot hurts everyone near where it lands.',
+        val: function (l) { return l; }, show: function (v) { return v + (v === 1 ? ' gun' : ' guns'); } },
+      { id: 'bala', icon: 'crack', branch: 'post', x: 2, y: 0, req: { lantaka: 1 }, max: 15, cost: 90, growth: 1.55,
+        name: 'Church Bells', desc: 'Melted down and cast into shot. The convento will not be needing them. The guns hit harder.',
+        val: function (l) { return 1 + 0.15 * l; }, show: plus },
+      { id: 'polvorin', icon: 'storm', branch: 'post', x: 3, y: 0, req: { bala: 3 }, max: 8, cost: 260, growth: 1.7,
+        name: 'The Polvorín', desc: 'The powder magazine at San Juan del Monte, where the first blow of the rising fell. With powder to spare, the guns are charged to the muzzle and their shot bursts wider.',
+        val: function (l) { return 0.5 * l; }, show: function (v) { return '+' + v.toFixed(1) + ' to the burst'; } },
+      { id: 'trinchera', icon: 'shovel', branch: 'post', x: 3, y: -1, req: { bala: 2 }, max: 10, cost: 240, growth: 1.65,
+        name: 'Evangelista\'s Trenches', desc: 'Edilberto Evangelista studied engineering in Ghent and came home to dig. Wherever your men stand they have earth in front of them: rifle and cannon fire does them less harm.',
+        val: function (l) { return 1 - 0.04 * l; }, show: less('less harm from shot and shell') },
+
+      { id: 'botica', icon: 'heart', branch: 'town', x: -1, y: 1, req: { bandera: 0 }, max: 8, cost: 80, growth: 1.75,
+        name: 'The Field Hospital', desc: 'Basilio is a medical student now, or near enough. The wounded are patched up while the fight goes on.',
+        val: function (l) { return 0.004 * l; }, show: function (v) { return (v * 100).toFixed(1) + '% of each man\'s strength a second'; } },
+      { id: 'martsa', icon: 'boots', branch: 'town', x: -2, y: 1, req: { botica: 1 }, max: 6, cost: 70, growth: 1.7,
+        name: 'Forced Marches', desc: 'They have walked behind a plough all their lives. Everyone moves faster on the field.',
+        val: function (l) { return 1 + 0.05 * l; }, show: plus },
+      { id: 'tambuli', icon: 'shell', branch: 'town', x: -3, y: 1, req: { martsa: 1 }, max: 6, cost: 220, growth: 1.9,
+        name: 'The Tambuli', desc: 'A carabao horn, blown from the rear. It called the barrio to the fields, and now it calls a broken line back together: on your word every company still standing gets some of its strength back.',
+        val: function (l) { return l ? 0.1 + 0.03 * l : 0; }, show: function (v) { return Math.round(v * 100) + '% of their strength'; } },
+      { id: 'tandang', icon: 'candle', branch: 'friend', x: -1, y: 2, req: { botica: 2 }, max: 6, cost: 250, growth: 1.8,
+        name: 'Tandang Sora', desc: 'Melchora Aquino is eighty-four and keeps a store at Balintawak. She feeds whoever comes and binds whoever bleeds. A company that goes down may get up again, once.',
+        val: function (l) { return 0.08 * l; }, show: function (v) { return Math.round(v * 100) + '% of fallen companies rise again'; } },
+      { id: 'kartilya', icon: 'book', branch: 'kkk', x: -2, y: 2, req: { tandang: 1 }, max: 13, cost: 140, growth: 1.6,
+        name: 'The Kartilya', desc: 'Emilio Jacinto was nineteen when he wrote the primer of the Katipunan: thirteen teachings, learnt by heart before the oath. Men who know why they stand, stand longer.',
+        val: function (l) { return 1 + 0.05 * l; }, show: plus },
+
+      { id: 'elias', icon: 'boat', branch: 'friend', x: 0, y: 1, req: { bandera: 2 }, max: 6, cost: 220, growth: 1.75,
+        name: 'Elías', desc: 'The pilot is still with you. Every few seconds he picks off the strongest man on the other side.',
+        val: function (l) { return l; }, show: function (v) { return 'a shot every ' + (7 - 0.5 * v) + ' seconds'; } },
+      { id: 'lakambini', icon: 'lamp', branch: 'friend', x: 0, y: 2, req: { elias: 1 }, max: 8, cost: 180, growth: 1.7,
+        name: 'The Lakambini', desc: 'Gregoria de Jesús keeps the seal and the papers of the Katipunan, and has ridden out of more than one house by the back while the Guardia came in by the front. Under her the women carry the orders and the cartridges: your commands can be given again sooner.',
+        val: function (l) { return 1 - 0.05 * l; }, show: less('less waiting between commands') },
+
+      { id: 'samsam', icon: 'bag', branch: 'chest', x: 1, y: 1, req: { bandera: 0 }, max: 15, cost: 45, growth: 1.55,
+        name: 'Spoils', desc: 'Rifles, boots, the regimental chest. More salapi for every enemy brought down.',
+        val: function (l) { return 1 + 0.12 * l; }, show: plus },
+      { id: 'espiya', icon: 'talk', branch: 'chest', x: 2, y: 1, req: { samsam: 2 }, max: 8, cost: 140, growth: 1.8,
+        name: 'The Triangles', desc: 'Each brother recruits two more, who never learn each other\'s names. There is a triangle in every barracks kitchen, and part of each garrison is sent the wrong way before the battle.',
+        val: function (l) { return 1 - 0.03 * l; }, show: less('fewer enemies') },
+      { id: 'cedula', icon: 'scroll', branch: 'chest', x: 1, y: 2, req: { samsam: 1 }, max: 10, cost: 100, growth: 1.6,
+        name: 'The Torn Cédulas', desc: 'At Pugad Lawin they took out the tax papers that made them subjects of the King and tore them up, shouting. What a town used to pay in tribute it now pays to you: the chest of every town you free is fuller.',
+        val: function (l) { return 1 + 0.25 * l; }, show: plus },
+      { id: 'kalayaan', icon: 'slate', branch: 'kkk', x: 2, y: 2, req: { cedula: 1 }, max: 10, cost: 160, growth: 1.6,
+        name: 'Kalayaan', desc: 'One issue of the paper was printed, dated from Yokohama to fool the censors, and thirty thousand joined in a season. Every road has eyes for you now: columns and convoys are caught with more on them.',
+        val: function (l) { return 1 + 0.15 * l; }, show: plus },
+
+      { id: 'ranggo', icon: 'medal', branch: 'kkk', x: 3, y: 1, req: { bandera: 5 }, max: 3, cost: 1500, growth: 8,
+        name: 'Katipon, Kawal, Bayani', desc: 'The three grades of the Katipunan: the black hood, the green, the red. Each has its password, and each makes a harder man: everyone hits harder and stands longer.',
+        val: function (l) { return 1 + 0.15 * l; }, show: plus },
+      { id: 'supremo', icon: 'star', branch: 'kkk', x: 4, y: 0, req: { ranggo: 1 }, max: 10, cost: 3000, growth: 1.9,
+        name: 'The Supremo', desc: 'Andrés Bonifacio sold fans and canes in the street, read Hugo by candlelight, and founded the Katipunan the night Rizal was banished. Where his name is spoken men go forward: everyone hits harder still.',
+        val: function (l) { return 1 + 0.08 * l; }, show: plus }
+    ],
+
+    intro: 'San Diego held, and it cost her everything. Season after season they came back up the roads; the church is a shell, the fields are ash, and half the town lies in the new graves by the cemetery. Nobody speaks of the school any more. They speak of ending it: not one more siege, but the whole rotten thing, from the convento door to the walls of Manila. The filibusteros have found a better name for themselves, and the King\'s pesos, with his face on them, go into the lake. A free country will strike its own.',
+    wall: 'Laguna, Cavite, Batangas, Morong, Bulacán: every province round the capital is free, and the wall the Captain-General threw up round Manila and its arrabales has nobody left to feed it. Last night it was breached in four places. The city is open.',
+    victory: 'At noon the gate of Intramuros opens from the inside, and the Captain-General comes out on foot with his sword held by the blade. Over Fort Santiago the red and gold comes down, and the sun and three stars goes up in its place. In San Diego, a long way south, somebody is ringing the school bell and will not stop. It took a school, a siege and twenty-five battles; and it is done.'
   };
 })();

@@ -90,6 +90,9 @@ Design goal: every stat is a trade-off. Pure Funds grows the school but attracts
 - Playtest the trade-offs between Funds, Discretion and Pedagogy.
 - Audio: church bells, lake wind, market sounds.
 
+**Next: part four, the rebuilding**
+- After the revolution (part three), an incremental city builder: Manila, and then the other towns of the Philippines, are rebuilt from what the war left of them.
+
 ## 8. Open questions for you
 
 1. **Engine:** Godot is a good fit for 3D isometric and is available through the tooling here. Do you want Godot, or another engine?

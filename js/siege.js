@@ -75,6 +75,7 @@
   }
   function enter() {
     G.hide('tree'); G.hide('shop'); G.hide('title');
+    if (sg() && sg().won) { Noli.War.enter(); return; } // the siege is won (a save from before the revolution was written): on to the rest of the country
     if (!sg()) {
       start(); G.phase('event'); W.setDaylight(1.25); G.sfx.hit();
       G.dusk('The Siege of San Diego', SD.intro, [['fili', sg().f, 'filibusteros, to raise posts beside the roads'], ['heart', maxHp(), 'is what the school can take in a day']], 'Defend the school', dawn);
@@ -208,7 +209,7 @@
     if (botting) return;
     G.save(); G.phase('event'); W.setDaylight(1.6); W.ringBell(); G.sfx.bell(); W.ghost();
     var rows = [['guardia', R.kills, 'brought down'], ['coin', '+' + G.fmt(R.earn + R.gift), 'pesos'], ['heart', Math.ceil(R.hp) + ' / ' + maxHp(), 'the school at nightfall', win ? '' : 'gold']];
-    if (last) { G.sfx.win(); G.dusk('San Diego Holds', SD.victory, rows, 'Stay on the lookouts', night); return; }
+    if (last) { G.sfx.win(); G.dusk('San Diego Holds', SD.victory, rows, 'And then…', function () { Noli.War.enter(); }); return; }
     var title = win ? 'Day ' + day + ' is held' : 'The school is overrun', text;
     if (boss && R.bossDown) {
       text = boss.name + ' will not be back. ' + (s.boss < routes.length ? 'But word comes that they have found another road into the town.' : 'The convento is running out of champions.') +
